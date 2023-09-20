@@ -1,0 +1,116 @@
+use crate::{
+  lexer::{tokens::Token, LexicalError},
+  ast::{self, Condition, Operator, Operand},
+};
+
+grammar;
+
+extern {
+  type Location = usize;
+  type Error = LexicalError;
+
+  enum Token {
+    "+" => Token::Add,
+    "-" => Token::Sub,
+    "*" => Token::Mul,
+    "/" => Token::Div,
+    "=" => Token::Assign,
+    "<" => Token::LessThan,
+    ">" => Token::GreaterThan,
+    "<=" => Token::LessThanOrEqual,
+    ">=" => Token::GreaterThanOrEqual,
+    "==" => Token::Equal,
+    "!=" => Token::NotEqual,
+    "&&" => Token::And,
+    "||" => Token::Or,
+    "if" => Token::If,
+    "goto" => Token::Goto,
+    "identifier" => Token::Identifier(<String>),
+    "literal" => Token::Literal(<i64>),
+    "[" => Token::OpenBracket,
+    "]" => Token::CloseBracket,
+    ":" => Token::Colon,
+  }
+}
+
+pub Program: Vec<ast::Statement> = {
+  <stmts:Statement*> => stmts
+};
+
+Statement: ast::Statement = {
+  <destination:"identifier"> "=" <source:Operand> => {
+    ast::Statement::Assignment {
+      destination,
+      source,
+      location: 0..0,
+    }
+  },
+  <destination:"identifier"> "=" <operation:BinaryOperation> => {
+    ast::Statement::BinaryThenAssignment {
+      destination,
+      operation,
+      location: 0..0,
+    }
+  },
+  "if" <lhs:Operand> <condition:Condition> <rhs:Operand> "goto" <label:"identifier"> => {
+    ast::Statement::ConditionalJump {
+      lhs,
+      rhs,
+      condition,
+      label,
+      location: 0..0,
+    }
+  },
+  "goto" <label:"identifier"> => {
+    ast::Statement::UnconditionalJump {
+      label,
+      location: 0..0,
+    }
+  },
+  <name:"identifier"> ":" => {
+    ast::Statement::Label {
+      name,
+      location: 0..0,
+    }
+  },
+};
+
+BinaryOperation: ast::BinaryOperation = {
+  <lhs:Operand> <operator:Operator> <rhs:Operand> => {
+    ast::BinaryOperation::Arithmetic {
+      lhs,
+      rhs,
+      operator,
+    }
+  },
+  <lhs:Operand> <condition:Condition> <rhs:Operand> => {
+    ast::BinaryOperation::Conditional {
+      lhs,
+      rhs,
+      condition,
+    }
+  },
+};
+
+Operand: ast::Operand = {
+  <name:"identifier"> => Operand::Identifier(name),
+  <value:"literal"> => Operand::Literal(value),
+};
+
+Operator: ast::Operator = {
+  "+" => Operator::Add,
+  "-" => Operator::Sub,
+  "*" => Operator::Mul,
+  "/" => Operator::Div,
+};
+
+Condition: ast::Condition = {
+  "<" => Condition::LessThan,
+  ">" => Condition::GreaterThan,
+  "<=" => Condition::LessThanOrEqual,
+  ">=" => Condition::GreaterThanOrEqual,
+  "==" => Condition::Equal,
+  "!=" => Condition::NotEqual,
+  "&&" => Condition::And,
+  "||" => Condition::Or,
+};
