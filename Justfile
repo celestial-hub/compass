@@ -1,4 +1,4 @@
 alias r := run
 
-run:
-  cargo run --release
+run *args:
+  cargo run --release -- {{args}}

@@ -1,0 +1,9 @@
+func hello()
+begin
+  a: i32 = 1
+end
+
+func hello_2(arg: i32)
+begin
+  a: i32 = arg
+end

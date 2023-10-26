@@ -1,10 +1,12 @@
-use compass::{lexer::Lexer, parser::Parser};
+use clap::Parser;
+use compass::cli::{Cli, Commands};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let source_code = std::fs::read_to_string("assets/fibonacci.tac")?;
-  let lexer = Lexer::new(&source_code[..]);
-  let ast = Parser::new().parse(lexer)?;
-  println!("{:#?}", ast);
+  let cli = Cli::parse();
+
+  let _ = match &cli.command {
+    Commands::Emit(options) => compass::cli::emit::ast(options),
+  };
 
   Ok(())
 }

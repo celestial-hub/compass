@@ -1,0 +1,6 @@
+# First, evaluate the individual comparisons "a > b" and "b > c"
+temp1: bool = a > b
+temp2: bool = b > c
+
+# Then, use the '&&' operation to combine the results of the two comparisons
+result: bool = temp1 && temp2

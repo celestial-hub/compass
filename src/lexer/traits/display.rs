@@ -4,6 +4,8 @@ impl std::fmt::Display for LexicalError {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     match self {
       LexicalError::InvalidToken => write!(f, "Invalid token"),
+      LexicalError::WrongType => write!(f, "Wrong type"),
+      LexicalError::UnknownVariable => write!(f, "Unknown variable"),
     }
   }
 }

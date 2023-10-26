@@ -1,7 +1,10 @@
 use ariadne::ReportBuilder;
 use lalrpop_util::{lalrpop_mod, ParseError};
 
-use crate::{ast, lexer::Lexer};
+use crate::{
+  ast::{self, context::Context},
+  lexer::Lexer,
+};
 
 pub struct Parser;
 
@@ -19,8 +22,12 @@ impl Parser {
 
     let a = colors.next();
 
+    let filename = lexer.filepath.split('/').last().unwrap();
+    let filepath = lexer.filepath;
+    let source = std::fs::read_to_string(filepath).unwrap();
+
     let report: ReportBuilder<(&str, std::ops::Range<usize>)> =
-      Report::build(ReportKind::Error, "sample.tac", 12)
+      Report::build(ReportKind::Error, filename, 12)
         .with_code(3)
         .with_config(Config::default().with_tab_width(2))
         .with_note(format!(
@@ -28,22 +35,19 @@ impl Parser {
           "github.com/celestial-hub/compass/issues".fg(Color::Blue)
         ));
 
-    match compass_grammar::ProgramParser::new().parse(lexer) {
+    match compass_grammar::ProgramParser::new().parse(&mut Context::default(), lexer) {
       Ok(ast) => Ok(ast),
       Err(err) => match err {
         ParseError::InvalidToken { location } => {
           report
             .with_message("Invalid token".fg(Color::Red))
             .with_label(
-              Label::new(("comparison.tac", location..location))
+              Label::new((filename, location..location))
                 .with_message("Invalid token")
                 .with_color(a),
             )
             .finish()
-            .print((
-              "comparison.tac",
-              Source::from(include_str!("../../assets/fibonacci.tac")),
-            ))
+            .print((filename, Source::from(source)))
             .unwrap();
 
           Err(Box::new(err))
@@ -55,7 +59,7 @@ impl Parser {
           report
             .with_message("Unrecognized token".fg(Color::Red))
             .with_label(
-              Label::new(("comparison.tac", token.0..token.2))
+              Label::new((filename, token.0..token.2))
                 .with_message("Unrecognized token")
                 .with_color(a),
             )
@@ -73,10 +77,7 @@ impl Parser {
                 .join(", ")
             ))
             .finish()
-            .print((
-              "comparison.tac",
-              Source::from(include_str!("../../assets/fibonacci.tac")),
-            ))
+            .print((filename, Source::from(source)))
             .unwrap();
           Err(Box::new(err))
         }

@@ -1,0 +1,42 @@
+func funcao()
+begin
+end
+
+func fibonacci(param N: i32): i32
+begin
+    # Initial conditions
+    a: i32 = 0
+    b: i32 = 1
+
+    # Handle the base cases
+    if N == 0 goto end
+    if N == 1 goto return_b
+
+    # Counter for the loop
+    counter: i32 = 2  # Because we've already handled the first two cases
+
+    loop:
+      # Calculate the next Fibonacci number
+      c: i32 = a + b
+      # Update the values for the next iteration
+      a = b
+      b = c
+
+      # Increment the counter and check if we've reached N
+      counter = counter + 1
+      if counter > N goto end_loop
+
+      goto loop  # repeat the loop
+
+    end_loop:
+      # When the loop finishes, 'b' holds the N-th Fibonacci number
+      goto end
+
+    return_b:
+      # In case N is 1, the result is 'b', which is 1
+      return b
+
+    end:
+      # In case N is 0 or when the loop is finished, 'a' holds the result
+      return a
+end

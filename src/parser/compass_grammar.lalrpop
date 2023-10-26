@@ -1,9 +1,10 @@
 use crate::{
   lexer::{tokens::Token, LexicalError},
-  ast::{self, Condition, Operator, Operand},
+  ast::{self, Condition, Operator, Operand, VarType, context::Context},
 };
+use lalrpop_util::ParseError;
 
-grammar;
+grammar(context: &mut Context);
 
 extern {
   type Location = usize;
@@ -26,9 +27,28 @@ extern {
     "if" => Token::If,
     "goto" => Token::Goto,
     "identifier" => Token::Identifier(<String>),
-    "literal" => Token::Literal(<i64>),
+    "type" => Token::Type(<String>),
+    "literal_i8" => Token::LiteralI8(<i8>),
+    "literal_i16" => Token::LiteralI16(<i16>),
+    "literal_i32" => Token::LiteralI32(<i32>),
+    "literal_i64" => Token::LiteralI64(<i64>),
+    "literal_u8" => Token::LiteralU8(<u8>),
+    "literal_u16" => Token::LiteralU16(<u16>),
+    "literal_u32" => Token::LiteralU32(<u32>),
+    "literal_u64" => Token::LiteralU64(<u64>),
+    "literal_f32" => Token::LiteralF32(<f32>),
+    "literal_f64" => Token::LiteralF64(<f64>),
+    "literal_true" => Token::LiteralTrue,
+    "literal_false" => Token::LiteralFalse,
+    "literal_string" => Token::LiteralString(<String>),
+    "func" => Token::Function,
+    "begin" => Token::Begin,
+    "end" => Token::End,
+    "return" => Token::Return,
     "[" => Token::OpenBracket,
     "]" => Token::CloseBracket,
+    "(" => Token::OpenParen,
+    ")" => Token::CloseParen,
     ":" => Token::Colon,
   }
 }
@@ -38,20 +58,45 @@ pub Program: Vec<ast::Statement> = {
 };
 
 Statement: ast::Statement = {
-  <destination:"identifier"> "=" <source:Operand> => {
-    ast::Statement::Assignment {
-      destination,
-      source,
-      location: 0..0,
-    }
+  <name:"identifier"> ":" <var_type:"type"> "=" <value:Operand> =>? {
+
+    let variable = match value {
+      Operand::Identifier(variable_name) => {
+        let variable = context.get_variable(variable_name).ok_or(ParseError::User { error: LexicalError::UnknownVariable })?;
+
+        if variable.var_type != var_type.into() {
+          return Err(ParseError::User { error: LexicalError::WrongType });
+        }
+
+        ast::Statement::Variable {
+          name,
+          var_type: variable.var_type.clone(),
+          value: variable.value.clone(),
+          location: 0..0,
+        }
+      },
+      _ => {
+        let var_type: VarType = var_type.try_into().unwrap();
+        let value_type: VarType = value.clone().try_into().unwrap();
+
+        if var_type != value_type {
+          return Err(ParseError::User { error: LexicalError::WrongType });
+        }
+
+        ast::Statement::Variable {
+          name,
+          var_type,
+          value,
+          location: 0..0,
+        }
+      },
+    };
+
+    context.add_variable(variable.clone());
+
+    Ok(variable)
   },
-  <destination:"identifier"> "=" <operation:BinaryOperation> => {
-    ast::Statement::BinaryThenAssignment {
-      destination,
-      operation,
-      location: 0..0,
-    }
-  },
+
   "if" <lhs:Operand> <condition:Condition> <rhs:Operand> "goto" <label:"identifier"> => {
     ast::Statement::ConditionalJump {
       lhs,
@@ -61,16 +106,52 @@ Statement: ast::Statement = {
       location: 0..0,
     }
   },
+
   "goto" <label:"identifier"> => {
     ast::Statement::UnconditionalJump {
       label,
       location: 0..0,
     }
   },
+
   <name:"identifier"> ":" => {
     ast::Statement::Label {
       name,
       location: 0..0,
+    }
+  },
+
+  "func" <name:"identifier"> "(" <args:Arguments> ")" <return_type:Return?> "begin" <body:Statement*> "end" => {
+    let return_type = match return_type {
+      Some(return_type) => return_type.var_type.into(),
+      None => VarType::Void,
+    };
+
+    ast::Statement::Function {
+      name,
+      args,
+      return_type,
+      body,
+      location: 0..0,
+    }
+  },
+};
+
+Return: ast::Return = {
+  ":" <var_type:"type"> => {
+    ast::Return { var_type: var_type.into() }
+  },
+}
+
+Arguments: Vec<ast::Argument> = {
+  <args:Argument*> => args
+};
+
+Argument: ast::Argument = {
+  <name:"identifier"> ":" <var_type:"type"> => {
+    ast::Argument {
+      name,
+      var_type: var_type.into(),
     }
   },
 };
@@ -94,7 +175,19 @@ BinaryOperation: ast::BinaryOperation = {
 
 Operand: ast::Operand = {
   <name:"identifier"> => Operand::Identifier(name),
-  <value:"literal"> => Operand::Literal(value),
+  <value:"literal_i8"> => Operand::LiteralI8(value),
+  <value:"literal_i16"> => Operand::LiteralI16(value),
+  <value:"literal_i32"> => Operand::LiteralI32(value),
+  <value:"literal_i64"> => Operand::LiteralI64(value),
+  <value:"literal_u8"> => Operand::LiteralU8(value),
+  <value:"literal_u16"> => Operand::LiteralU16(value),
+  <value:"literal_u32"> => Operand::LiteralU32(value),
+  <value:"literal_u64"> => Operand::LiteralU64(value),
+  <value:"literal_f32"> => Operand::LiteralF32(value),
+  <value:"literal_f64"> => Operand::LiteralF64(value),
+  "literal_true" => Operand::LiteralBool(true),
+  "literal_false" => Operand::LiteralBool(false),
+  <value:"literal_string"> => Operand::LiteralStr(value),
 };
 
 Operator: ast::Operator = {
