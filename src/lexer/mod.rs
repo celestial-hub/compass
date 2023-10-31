@@ -13,10 +13,22 @@ pub struct Lexer<'input> {
 }
 
 #[derive(Debug)]
+pub struct ErrorTip {
+  pub message: String,
+  pub location: std::ops::Range<usize>,
+}
+
+#[derive(Debug)]
 pub enum LexicalError {
   InvalidToken,
-  WrongType,
-  UnknownVariable,
+  WrongType {
+    error: Vec<ErrorTip>,
+    help: Option<String>,
+  },
+  UnknownVariable {
+    error: Vec<ErrorTip>,
+    help: Option<String>,
+  },
 }
 
 impl<'input> Lexer<'input> {

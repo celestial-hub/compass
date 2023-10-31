@@ -3,7 +3,7 @@ use std::str::FromStr;
 pub type Location = std::ops::Range<usize>;
 pub mod context;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum VarType {
   I8,
   I16,
@@ -45,6 +45,26 @@ impl FromStr for VarType {
 impl From<String> for VarType {
   fn from(s: String) -> Self {
     s.as_str().parse().unwrap()
+  }
+}
+
+impl From<VarType> for String {
+  fn from(value: VarType) -> Self {
+    match value {
+      VarType::I8 => "i8".to_string(),
+      VarType::I16 => "i16".to_string(),
+      VarType::I32 => "i32".to_string(),
+      VarType::I64 => "i64".to_string(),
+      VarType::U8 => "u8".to_string(),
+      VarType::U16 => "u16".to_string(),
+      VarType::U32 => "u32".to_string(),
+      VarType::U64 => "u64".to_string(),
+      VarType::Bool => "bool".to_string(),
+      VarType::F32 => "f32".to_string(),
+      VarType::F64 => "f64".to_string(),
+      VarType::Str => "str".to_string(),
+      VarType::Void => "void".to_string(),
+    }
   }
 }
 

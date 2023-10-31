@@ -3,7 +3,7 @@ use lalrpop_util::{lalrpop_mod, ParseError};
 
 use crate::{
   ast::{self, context::Context},
-  lexer::Lexer,
+  lexer::{Lexer, LexicalError},
 };
 
 pub struct Parser;
@@ -26,7 +26,7 @@ impl Parser {
     let filepath = lexer.filepath;
     let source = std::fs::read_to_string(filepath).unwrap();
 
-    let report: ReportBuilder<(&str, std::ops::Range<usize>)> =
+    let mut report: ReportBuilder<(&str, std::ops::Range<usize>)> =
       Report::build(ReportKind::Error, filename, 12)
         .with_code(3)
         .with_config(Config::default().with_tab_width(2))
@@ -46,6 +46,34 @@ impl Parser {
                 .with_message("Invalid token")
                 .with_color(a),
             )
+            .finish()
+            .print((filename, Source::from(source)))
+            .unwrap();
+
+          Err(Box::new(err))
+        }
+        ParseError::User { ref error } => {
+          let (errors, help) = match error {
+            LexicalError::WrongType { error, help } => (error, help),
+            LexicalError::UnknownVariable { error, help } => (error, help),
+            _ => unreachable!(),
+          };
+
+          report = report.with_message("Error".fg(Color::Red));
+
+          for error in errors {
+            report = report.with_label(
+              Label::new((filename, error.location.clone()))
+                .with_message(error.message.clone())
+                .with_color(a),
+            );
+          }
+
+          if let Some(help) = help {
+            report = report.with_help(help.clone());
+          }
+
+          report
             .finish()
             .print((filename, Source::from(source)))
             .unwrap();

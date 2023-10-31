@@ -1,5 +1,5 @@
 use crate::{
-  lexer::{tokens::Token, LexicalError},
+  lexer::{tokens::Token, LexicalError, ErrorTip},
   ast::{self, Condition, Operator, Operand, VarType, context::Context},
 };
 use lalrpop_util::ParseError;
@@ -58,14 +58,31 @@ pub Program: Vec<ast::Statement> = {
 };
 
 Statement: ast::Statement = {
-  <name:"identifier"> ":" <var_type:"type"> "=" <value:Operand> =>? {
+  <l1:@L> <name:"identifier"> <r1:@R> ":" <l2:@L> <var_type:"type"> <r2:@R> "=" <l3:@L> <value:Operand> <r3:@R> =>? {
 
-    let variable = match value {
+    let variable = match value.clone() {
       Operand::Identifier(variable_name) => {
-        let variable = context.get_variable(variable_name).ok_or(ParseError::User { error: LexicalError::UnknownVariable })?;
+        let variable = context.get_variable(variable_name.clone()).ok_or(ParseError::User { error: LexicalError::UnknownVariable {
+          error: vec![
+            ErrorTip { message: format!("unknown variable `{}`", variable_name), location: l3..r3 },
+          ],
+          help: None
+        }})?;
 
-        if variable.var_type != var_type.into() {
-          return Err(ParseError::User { error: LexicalError::WrongType });
+        if variable.var_type != var_type.clone().into() {
+          return Err(ParseError::User { error: LexicalError::WrongType {
+            error: vec![
+              ErrorTip { message: format!("expected `{}`", Into::<String>::into(var_type.clone())), location: l2..r2 },
+              ErrorTip { message: format!("found variable {} which is `{}`", variable_name, Into::<String>::into(variable.var_type)), location: l3..r3 },
+            ],
+            help: Some(
+              format!(
+                "You can either try to cast the value to `{}` or change the variable type to `{}`",
+                Into::<String>::into(var_type),
+                Into::<String>::into(variable.var_type)
+              )
+            ),
+          }});
         }
 
         ast::Statement::Variable {
@@ -79,8 +96,20 @@ Statement: ast::Statement = {
         let var_type: VarType = var_type.try_into().unwrap();
         let value_type: VarType = value.clone().try_into().unwrap();
 
-        if var_type != value_type {
-          return Err(ParseError::User { error: LexicalError::WrongType });
+        if var_type != value_type.clone() {
+          return Err(ParseError::User { error: LexicalError::WrongType {
+            error: vec![
+              ErrorTip { message: format!("expected `{}`", Into::<String>::into(var_type)), location: l2..r2 },
+              ErrorTip { message: format!("found `{}`", Into::<String>::into(value_type)), location: l3..r3 },
+            ],
+            help: Some(
+              format!(
+                "You can either try to cast the value to `{}` or change the variable type to `{}`",
+                Into::<String>::into(var_type),
+                Into::<String>::into(value_type)
+              )
+            ),
+          }});
         }
 
         ast::Statement::Variable {
