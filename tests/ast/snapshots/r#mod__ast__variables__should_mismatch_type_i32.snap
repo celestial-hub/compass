@@ -1,0 +1,21 @@
+---
+source: tests/ast/variables.rs
+expression: "ast_from_code_str(r#\"a: i32 = 13.0\"#,\n    \"variables/should_mismatch_type_i32/default\")"
+---
+User {
+    error: WrongType {
+        error: [
+            ErrorTip {
+                message: "expected `i32`",
+                location: 3..6,
+            },
+            ErrorTip {
+                message: "found `f32`",
+                location: 9..13,
+            },
+        ],
+        help: Some(
+            "You can either try to cast the value to `i32` or change the variable type to `f32`",
+        ),
+    },
+}

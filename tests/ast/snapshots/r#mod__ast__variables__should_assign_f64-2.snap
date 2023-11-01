@@ -1,0 +1,14 @@
+---
+source: tests/ast/variables.rs
+expression: "ast_from_code_str(r#\"a: f64 = .3f64\"#,\n    \"variables/should_assign_f64/prefix_missing_with_type\")"
+---
+[
+    Variable {
+        var_type: F64,
+        name: "a",
+        value: LiteralF64(
+            0.3,
+        ),
+        location: 0..0,
+    },
+]
