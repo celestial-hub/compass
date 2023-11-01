@@ -4,3 +4,4 @@ pub mod parser;
 
 // TODO: later add this through features
 pub mod cli;
+pub mod utils;

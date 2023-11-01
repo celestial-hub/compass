@@ -20,11 +20,8 @@ impl Parser {
 
     let mut colors = ColorGenerator::default();
 
-    let a = colors.next();
-
     let filename = lexer.filepath.split('/').last().unwrap();
-    let filepath = lexer.filepath;
-    let source = std::fs::read_to_string(filepath).unwrap();
+    let source = lexer.source_code;
 
     let mut report: ReportBuilder<(&str, std::ops::Range<usize>)> =
       Report::build(ReportKind::Error, filename, 12)
@@ -44,7 +41,7 @@ impl Parser {
             .with_label(
               Label::new((filename, location..location))
                 .with_message("Invalid token")
-                .with_color(a),
+                .with_color(colors.next()),
             )
             .finish()
             .print((filename, Source::from(source)))
@@ -65,7 +62,7 @@ impl Parser {
             report = report.with_label(
               Label::new((filename, error.location.clone()))
                 .with_message(error.message.clone())
-                .with_color(a),
+                .with_color(colors.next()),
             );
           }
 
@@ -89,7 +86,7 @@ impl Parser {
             .with_label(
               Label::new((filename, token.0..token.2))
                 .with_message("Unrecognized token")
-                .with_color(a),
+                .with_color(colors.next()),
             )
             .with_help(format!(
               "Expected one of the following: {}",
