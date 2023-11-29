@@ -62,7 +62,6 @@ Statement: ast::Statement = {
 
     let variable = match value.clone() {
       Expr::Operand(operand) => {
-        println!("Operand: {:?}", operand);
         match operand {
           Operand::Identifier(variable_name) => {
             let variable = context.get_variable(variable_name.clone()).ok_or(ParseError::User { error: LexicalError::UnknownVariable {
@@ -125,7 +124,6 @@ Statement: ast::Statement = {
         }
       },
       Expr::BinaryOperation(bin_op) => {
-        println!("Binary operation: {:?}", bin_op);
         let var_type: VarType = var_type.try_into().unwrap();
         let value_type: VarType = match bin_op {
           ast::BinaryOperation::Arithmetic { operation_type, .. } => operation_type,
@@ -156,7 +154,6 @@ Statement: ast::Statement = {
             })
       },
       Expr::FunctionCall(function) => {
-        println!("Function call: {:?}", function);
         let var_type: VarType = var_type.try_into().unwrap();
         let value_type: VarType = function.return_type.clone().try_into().unwrap();
 
