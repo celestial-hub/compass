@@ -1,6 +1,6 @@
 use crate::{
   lexer::{tokens::Token, LexicalError, ErrorTip},
-  ast::{self, Condition, Operator, Operand, VarType, context::Context},
+  ast::{self, Condition, Operator, Operand, Expr, VarType, context::Context},
 };
 use lalrpop_util::ParseError;
 
@@ -58,45 +58,81 @@ pub Program: Vec<ast::Statement> = {
 };
 
 Statement: ast::Statement = {
-  <l1:@L> <name:"identifier"> <r1:@R> ":" <l2:@L> <var_type:"type"> <r2:@R> "=" <l3:@L> <value:Operand> <r3:@R> =>? {
+  <l1:@L> <name:"identifier"> <r1:@R> ":" <l2:@L> <var_type:"type"> <r2:@R> "=" <l3:@L> <value:Expr> <r3:@R> =>? {
 
     let variable = match value.clone() {
-      Operand::Identifier(variable_name) => {
-        let variable = context.get_variable(variable_name.clone()).ok_or(ParseError::User { error: LexicalError::UnknownVariable {
-          error: vec![
-            ErrorTip { message: format!("unknown variable `{}`", variable_name), location: l3..r3 },
-          ],
-          help: None
-        }})?;
+      Expr::Operand(operand) => {
+        println!("Operand: {:?}", operand);
+        match operand {
+          Operand::Identifier(variable_name) => {
+            let variable = context.get_variable(variable_name.clone()).ok_or(ParseError::User { error: LexicalError::UnknownVariable {
+              error: vec![
+                ErrorTip { message: format!("unknown variable `{}`", variable_name), location: l3..r3 },
+              ],
+              help: None
+            }})?;
 
-        if variable.var_type != var_type.clone().into() {
-          return Err(ParseError::User { error: LexicalError::WrongType {
-            error: vec![
-              ErrorTip { message: format!("expected `{}`", Into::<String>::into(var_type.clone())), location: l2..r2 },
-              ErrorTip { message: format!("found variable {} which is `{}`", variable_name, Into::<String>::into(variable.var_type)), location: l3..r3 },
-            ],
-            help: Some(
-              format!(
-                "You can either try to cast the value to `{}` or change the variable type to `{}`",
-                Into::<String>::into(var_type),
-                Into::<String>::into(variable.var_type)
-              )
-            ),
-          }});
-        }
+            if variable.var_type != var_type.clone().into() {
+              return Err(ParseError::User { error: LexicalError::WrongType {
+                error: vec![
+                  ErrorTip { message: format!("expected `{}`", Into::<String>::into(var_type.clone())), location: l2..r2 },
+                  ErrorTip { message: format!("found variable {} which is `{}`", variable_name, Into::<String>::into(variable.var_type)), location: l3..r3 },
+                ],
+                help: Some(
+                  format!(
+                    "You can either try to cast the value to `{}` or change the variable type to `{}`",
+                    Into::<String>::into(var_type),
+                    Into::<String>::into(variable.var_type)
+                  )
+                ),
+              }});
+            }
 
-        ast::Statement::Variable {
-          name,
-          var_type: variable.var_type.clone(),
-          value: variable.value.clone(),
-          location: 0..0,
+            ast::Statement::VariableDeclaration(ast::Variable {
+                name,
+                var_type: variable.var_type,
+                value: variable.value.clone(),
+                location: 0..0,
+                } )
+          },
+          _ => {
+            let var_type: VarType = var_type.try_into().unwrap();
+            let value_type: VarType = operand.clone().try_into().unwrap();
+
+            if var_type != value_type {
+              return Err(ParseError::User { error: LexicalError::WrongType {
+                error: vec![
+                  ErrorTip { message: format!("expected `{}`", Into::<String>::into(var_type)), location: l2..r2 },
+                  ErrorTip { message: format!("found `{}`", Into::<String>::into(value_type)), location: l3..r3 },
+                ],
+                help: Some(
+                  format!(
+                    "You can either try to cast the value to `{}` or change the variable type to `{}`",
+                    Into::<String>::into(var_type),
+                    Into::<String>::into(value_type)
+                  )
+                ),
+              }});
+            }
+
+            ast::Statement::VariableDeclaration(ast::Variable {
+                name,
+                var_type,
+                value,
+                location: 0..0,
+                })
+          },
         }
       },
-      _ => {
+      Expr::BinaryOperation(bin_op) => {
+        println!("Binary operation: {:?}", bin_op);
         let var_type: VarType = var_type.try_into().unwrap();
-        let value_type: VarType = value.clone().try_into().unwrap();
+        let value_type: VarType = match bin_op {
+          ast::BinaryOperation::Arithmetic { operation_type, .. } => operation_type,
+          ast::BinaryOperation::Conditional { operation_type, .. } => operation_type,
+        };
 
-        if var_type != value_type.clone() {
+        if var_type != value_type {
           return Err(ParseError::User { error: LexicalError::WrongType {
             error: vec![
               ErrorTip { message: format!("expected `{}`", Into::<String>::into(var_type)), location: l2..r2 },
@@ -112,13 +148,41 @@ Statement: ast::Statement = {
           }});
         }
 
-        ast::Statement::Variable {
-          name,
-          var_type,
-          value,
-          location: 0..0,
-        }
+        ast::Statement::VariableDeclaration(ast::Variable {
+            name,
+            var_type,
+            value: Expr::BinaryOperation(bin_op),
+            location: 0..0,
+            })
       },
+      Expr::FunctionCall(function) => {
+        println!("Function call: {:?}", function);
+        let var_type: VarType = var_type.try_into().unwrap();
+        let value_type: VarType = function.return_type.clone().try_into().unwrap();
+
+        if var_type != value_type {
+          return Err(ParseError::User { error: LexicalError::WrongType {
+            error: vec![
+              ErrorTip { message: format!("expected `{}`", Into::<String>::into(var_type)), location: l2..r2 },
+              ErrorTip { message: format!("found `{}`", Into::<String>::into(value_type)), location: l3..r3 },
+            ],
+            help: Some(
+              format!(
+                "You can either try to cast the value to `{}` or change the variable type to `{}`",
+                Into::<String>::into(var_type),
+                Into::<String>::into(value_type)
+              )
+            ),
+          }});
+        }
+
+        ast::Statement::VariableDeclaration(ast::Variable {
+            name,
+            var_type,
+            value: Expr::FunctionCall(function),
+            location: 0..0,
+            })
+      }
     };
 
     context.add_variable(variable.clone());
@@ -126,10 +190,8 @@ Statement: ast::Statement = {
     Ok(variable)
   },
 
-  "if" <lhs:Operand> <condition:Condition> <rhs:Operand> "goto" <label:"identifier"> => {
+  "if" <condition:Expr> "goto" <label:"identifier"> => {
     ast::Statement::ConditionalJump {
-      lhs,
-      rhs,
       condition,
       label,
       location: 0..0,
@@ -152,17 +214,17 @@ Statement: ast::Statement = {
 
   "func" <name:"identifier"> "(" <args:Arguments> ")" <return_type:Return?> "begin" <body:Statement*> "end" => {
     let return_type = match return_type {
-      Some(return_type) => return_type.var_type.into(),
+      Some(return_type) => return_type.var_type,
       None => VarType::Void,
     };
 
-    ast::Statement::Function {
-      name,
-      args,
-      return_type,
-      body,
-      location: 0..0,
-    }
+    ast::Statement::FunctionDefinition(ast::Function {
+        name,
+        args,
+        return_type,
+        body,
+        location: 0..0,
+    })
   },
 };
 
@@ -186,19 +248,64 @@ Argument: ast::Argument = {
 };
 
 BinaryOperation: ast::BinaryOperation = {
-  <lhs:Operand> <operator:Operator> <rhs:Operand> => {
-    ast::BinaryOperation::Arithmetic {
+  <l1:@L> <lhs:Operand> <r1:@R> <operator:Operator> <l2:@L> <rhs:Operand> <r2:@R> =>? {
+    let lhs_type = lhs.clone().get_type(context, l1..r1)?;
+    let rhs_type = rhs.clone().get_type(context, l2..r2)?;
+
+    if lhs_type != rhs_type {
+      return Err(ParseError::User { error: LexicalError::WrongType {
+        error: vec![
+          ErrorTip { message: format!("expected `{}`", Into::<String>::into(lhs_type)), location: l1..r1 },
+          ErrorTip { message: format!("found `{}`", Into::<String>::into(rhs_type)), location: l2..r2 },
+        ],
+        help: Some(
+          format!(
+            "Cannot perform the operation `{}` with `{}` and `{}`, you can either try to cast the value to `{}` or change the variable type to `{}`",
+            operator,
+            lhs_type,
+            rhs_type,
+            lhs_type,
+            rhs_type
+          )
+        ),
+      }});
+    }
+
+    Ok(ast::BinaryOperation::Arithmetic {
       lhs,
       rhs,
       operator,
-    }
+      operation_type: lhs_type,
+    })
   },
-  <lhs:Operand> <condition:Condition> <rhs:Operand> => {
-    ast::BinaryOperation::Conditional {
+  <l1:@L> <lhs:Operand> <r1:@R> <condition:Condition> <l2:@L> <rhs:Operand> <r2:@R> =>? {
+    let lhs_type = lhs.clone().get_type(context, l1..r1)?;
+    let rhs_type = rhs.clone().get_type(context, l2..r2)?;
+
+    if lhs_type != rhs_type {
+      return Err(ParseError::User { error: LexicalError::WrongType {
+        error: vec![
+          ErrorTip { message: format!("expected `{}`", Into::<String>::into(lhs_type)), location: l1..r1 },
+          ErrorTip { message: format!("found `{}`", Into::<String>::into(rhs_type)), location: l2..r2 },
+        ],
+        help: Some(
+          format!(
+            "Cannot compare `{}` with `{}`, you can either try to cast the value to `{}` or change the variable type to `{}`",
+            Into::<String>::into(lhs_type),
+            Into::<String>::into(rhs_type),
+            Into::<String>::into(lhs_type),
+            Into::<String>::into(rhs_type)
+          )
+        ),
+      }});
+    }
+
+    Ok(ast::BinaryOperation::Conditional {
       lhs,
       rhs,
       condition,
-    }
+      operation_type: VarType::Bool,
+    })
   },
 };
 
@@ -224,6 +331,11 @@ Operator: ast::Operator = {
   "-" => Operator::Sub,
   "*" => Operator::Mul,
   "/" => Operator::Div,
+};
+
+Expr: ast::Expr = {
+  BinaryOperation => Expr::BinaryOperation(<>),
+  Operand => Expr::Operand(<>),
 };
 
 Condition: ast::Condition = {

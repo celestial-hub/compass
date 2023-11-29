@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::{Location, Operand, Statement, VarType};
+use super::{Statement, Variable};
 
 // A struct to hold the context of the parser.
 #[derive(Debug)]
@@ -10,45 +10,7 @@ pub struct Context {
   // The current scope level.
   pub scope_level: usize,
   // A hash map of the variables by scope level in the parser.
-  pub variables: HashMap<usize, Vec<VariableInfo>>,
-}
-
-#[derive(Debug)]
-pub struct VariableInfo {
-  pub var_type: VarType,
-  pub name: String,
-  pub location: Location,
-  pub value: Operand,
-}
-
-impl From<Statement> for VariableInfo {
-  fn from(statement: Statement) -> Self {
-    match statement {
-      Statement::Variable {
-        var_type,
-        name,
-        location,
-        value,
-      } => Self {
-        var_type,
-        name,
-        location,
-        value,
-      },
-      _ => panic!("Cannot convert statement to variable info"),
-    }
-  }
-}
-
-impl From<&VariableInfo> for Statement {
-  fn from(variable_info: &VariableInfo) -> Self {
-    Self::Variable {
-      var_type: variable_info.var_type.clone(),
-      name: variable_info.name.clone(),
-      location: variable_info.location.clone(),
-      value: variable_info.value.clone(),
-    }
-  }
+  pub variables: HashMap<usize, Vec<Variable>>,
 }
 
 impl Context {
@@ -68,16 +30,16 @@ impl Context {
   }
 
   pub fn add_variable(&mut self, statement: Statement) {
-    let variable_info: VariableInfo = statement.into();
+    let variable = statement.into();
 
     if let Some(variables) = self.variables.get_mut(&self.scope_level) {
-      variables.push(variable_info);
+      variables.push(variable);
     } else {
-      self.variables.insert(self.scope_level, vec![variable_info]);
+      self.variables.insert(self.scope_level, vec![variable]);
     }
   }
 
-  pub fn get_variable(&self, name: String) -> Option<&VariableInfo> {
+  pub fn get_variable(&self, name: String) -> Option<&Variable> {
     for scope in (0..=self.scope_level).rev() {
       if let Some(variables) = self.variables.get(&scope) {
         for variable in variables {
@@ -95,5 +57,14 @@ impl Context {
 impl Default for Context {
   fn default() -> Self {
     Self::new()
+  }
+}
+
+impl From<Statement> for Variable {
+  fn from(statement: Statement) -> Self {
+    match statement {
+      Statement::VariableDeclaration(var) => var,
+      _ => panic!("Cannot convert statement to variable"),
+    }
   }
 }

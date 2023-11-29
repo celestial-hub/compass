@@ -1,0 +1,12 @@
+a: i32 = 1
+b: i32 = 2
+c: i32 = 3
+d: f32 = 4.0
+
+# "a > b" and "b < c"
+t1: bool = a > b
+t2: bool = b < c
+t3: bool = t1 && t2
+
+if d goto L1
+goto L2
