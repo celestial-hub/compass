@@ -75,6 +75,19 @@ fn should_assign_f64() {
 }
 
 #[test]
+fn should_assign_sum_of_i32() {
+  insta::assert_snapshot!(ast_from_code_str(
+    r#"a: i32 = 13 + 14"#,
+    "variables/should_assign_sum_of_i32/default"
+  ));
+
+  insta::assert_snapshot!(ast_from_code_str(
+    r#"a: i32 = 13i32 + 14i32"#,
+    "variables/should_assign_sum_of_i32/with_type"
+  ));
+}
+
+#[test]
 fn should_mismatch_type_i32() {
   insta::assert_snapshot!(ast_from_code_str(
     r#"a: i32 = 13.0"#,
@@ -87,5 +100,21 @@ fn should_mismatch_type_i32() {
     a: i32 = b
     "#,
     "variables/should_mismatch_type_i32/from_variable"
+  ));
+}
+
+#[test]
+fn should_mismatch_type_f32() {
+  insta::assert_snapshot!(ast_from_code_str(
+    r#"a: f32 = 13"#,
+    "variables/should_mismatch_type_f32/default"
+  ));
+
+  insta::assert_snapshot!(ast_from_code_str(
+    r#"
+    b: i32 = 13
+    a: f32 = b
+    "#,
+    "variables/should_mismatch_type_f32/from_variable"
   ));
 }

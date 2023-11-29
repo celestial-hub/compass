@@ -1,0 +1,25 @@
+---
+source: tests/ast/variables.rs
+expression: "ast_from_code_str(r#\"a: i32 = 13 + 14\"#,\n    \"variables/should_assign_sum_of_i32/default\")"
+---
+[
+    VariableDeclaration(
+        Variable {
+            var_type: I32,
+            name: "a",
+            value: BinaryOperation(
+                Arithmetic {
+                    lhs: LiteralI32(
+                        13,
+                    ),
+                    operator: Add,
+                    rhs: LiteralI32(
+                        14,
+                    ),
+                    operation_type: I32,
+                },
+            ),
+            location: 0..0,
+        },
+    ),
+]

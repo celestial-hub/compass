@@ -3,12 +3,16 @@ source: tests/ast/variables.rs
 expression: "ast_from_code_str(r#\"a: i32 = 13\"#, \"variables/should_assign_i32/default\")"
 ---
 [
-    Variable {
-        var_type: I32,
-        name: "a",
-        value: LiteralI32(
-            13,
-        ),
-        location: 0..0,
-    },
+    VariableDeclaration(
+        Variable {
+            var_type: I32,
+            name: "a",
+            value: Operand(
+                LiteralI32(
+                    13,
+                ),
+            ),
+            location: 0..0,
+        },
+    ),
 ]

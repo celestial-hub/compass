@@ -3,12 +3,16 @@ source: tests/ast/variables.rs
 expression: "ast_from_code_str(r#\"a: f32 = .3f32\"#,\n    \"variables/should_assign_f32/prefix_missing_with_type\")"
 ---
 [
-    Variable {
-        var_type: F32,
-        name: "a",
-        value: LiteralF32(
-            0.3,
-        ),
-        location: 0..0,
-    },
+    VariableDeclaration(
+        Variable {
+            var_type: F32,
+            name: "a",
+            value: Operand(
+                LiteralF32(
+                    0.3,
+                ),
+            ),
+            location: 0..0,
+        },
+    ),
 ]
