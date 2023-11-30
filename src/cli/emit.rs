@@ -1,6 +1,6 @@
 use clap::Args;
 
-use crate::{lexer::Lexer, parser::Parser};
+use crate::{ast::Statement, lexer::Lexer, parser::Parser};
 
 #[derive(Args)]
 pub struct EmitASTOptions {
@@ -15,7 +15,7 @@ pub struct EmitASTOptions {
 
 pub fn ast(
   EmitASTOptions { filepath, debug }: &EmitASTOptions,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<Vec<Statement>, Box<dyn std::error::Error>> {
   let source_code = std::fs::read_to_string(filepath)?;
   let lexer = Lexer::new(&source_code[..], filepath);
 
@@ -29,5 +29,5 @@ pub fn ast(
     println!("{:#?}", ast);
   }
 
-  Ok(())
+  Ok(ast)
 }
