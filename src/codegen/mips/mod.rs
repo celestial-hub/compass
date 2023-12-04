@@ -5,7 +5,7 @@ use super::Codegen;
 pub struct MipsCodegen;
 
 impl Codegen for MipsCodegen {
-  fn generate(&self, ast: Vec<Statement>) {
+  fn generate(&self, ast: Vec<Statement>) -> String {
     let mut data_section = astrolabe::ast::DataSection::default();
     let mut text_section = astrolabe::ast::TextSection {
       entrypoint: "main".to_string(),
@@ -114,6 +114,6 @@ impl Codegen for MipsCodegen {
       text_section,
     };
 
-    println!("{program}");
+    format!("{program}")
   }
 }
