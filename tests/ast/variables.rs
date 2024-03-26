@@ -1,4 +1,4 @@
-use compass::utils::ast_from_code_str;
+use celestial_hub_compass::utils::ast_from_code_str;
 
 #[test]
 fn should_assign_i32() {

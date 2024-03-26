@@ -6,8 +6,8 @@ pub struct MipsCodegen;
 
 impl Codegen for MipsCodegen {
   fn generate(&self, ast: Vec<Statement>) -> String {
-    let mut data_section = astrolabe::ast::DataSection::default();
-    let mut text_section = astrolabe::ast::TextSection {
+    let mut data_section = celestial_hub_astrolabe::ast::DataSection::default();
+    let mut text_section = celestial_hub_astrolabe::ast::TextSection {
       entrypoint: "main".to_string(),
       ..Default::default()
     };
@@ -27,13 +27,13 @@ impl Codegen for MipsCodegen {
               crate::ast::Operand::LiteralI8(val) => {
                 text_section
                   .statements
-                  .push(astrolabe::ast::Statement::Instruction(
-                    astrolabe::ast::Instruction::Li(
+                  .push(celestial_hub_astrolabe::ast::Statement::Instruction(
+                    celestial_hub_astrolabe::ast::Instruction::Li(
                       [
-                        astrolabe::ast::InstructionArgument::Register(astrolabe::ast::Register {
-                          name: register,
-                        }),
-                        astrolabe::ast::InstructionArgument::Immediate(val as u32),
+                        celestial_hub_astrolabe::ast::InstructionArgument::Register(
+                          celestial_hub_astrolabe::ast::Register { name: register },
+                        ),
+                        celestial_hub_astrolabe::ast::InstructionArgument::Immediate(val as u32),
                       ]
                       .into(),
                     ),
@@ -65,27 +65,27 @@ impl Codegen for MipsCodegen {
                   let rhs_register = register_map.get(&rhs).unwrap().clone();
 
                   // Depending on the operator, we need to use different instructions
-                  text_section
-                    .statements
-                    .push(astrolabe::ast::Statement::Instruction(match operator {
-                      crate::ast::Operator::Add => astrolabe::ast::Instruction::Add(
+                  text_section.statements.push(
+                    celestial_hub_astrolabe::ast::Statement::Instruction(match operator {
+                      crate::ast::Operator::Add => celestial_hub_astrolabe::ast::Instruction::Add(
                         [
-                          astrolabe::ast::InstructionArgument::Register(astrolabe::ast::Register {
-                            name: register,
-                          }),
-                          astrolabe::ast::InstructionArgument::Register(astrolabe::ast::Register {
-                            name: lhs_register,
-                          }),
-                          astrolabe::ast::InstructionArgument::Register(astrolabe::ast::Register {
-                            name: rhs_register,
-                          }),
+                          celestial_hub_astrolabe::ast::InstructionArgument::Register(
+                            celestial_hub_astrolabe::ast::Register { name: register },
+                          ),
+                          celestial_hub_astrolabe::ast::InstructionArgument::Register(
+                            celestial_hub_astrolabe::ast::Register { name: lhs_register },
+                          ),
+                          celestial_hub_astrolabe::ast::InstructionArgument::Register(
+                            celestial_hub_astrolabe::ast::Register { name: rhs_register },
+                          ),
                         ]
                         .into(),
                       ),
                       crate::ast::Operator::Sub => todo!(),
                       crate::ast::Operator::Mul => todo!(),
                       crate::ast::Operator::Div => todo!(),
-                    }));
+                    }),
+                  );
                 }
               }
               crate::ast::BinaryOperation::Conditional {
@@ -109,7 +109,7 @@ impl Codegen for MipsCodegen {
       }
     }
 
-    let program = astrolabe::ast::Program {
+    let program = celestial_hub_astrolabe::ast::Program {
       data_section,
       text_section,
     };

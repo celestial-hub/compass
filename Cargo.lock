@@ -95,18 +95,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "astrolabe"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "clap",
- "color-eyre",
- "lalrpop",
- "lalrpop-util",
- "logos",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -167,6 +155,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1174fb0b6ec23863f8b971027804a42614e347eafb0a95bf0b12cdae21fc4d0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "celestial-hub-astrolabe"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8fd3980a44b385ea1102db602df97961abb7bf2f61ea6cd0c109cfd3a23151f"
+dependencies = [
+ "ariadne",
+ "clap",
+ "color-eyre",
+ "lalrpop",
+ "lalrpop-util",
+ "logos",
+]
+
+[[package]]
+name = "celestial-hub-compass"
+version = "0.1.1"
+dependencies = [
+ "ariadne",
+ "celestial-hub-astrolabe",
+ "clap",
+ "insta",
+ "lalrpop",
+ "lalrpop-util",
+ "logos",
 ]
 
 [[package]]
@@ -249,19 +264,6 @@ name = "colorchoice"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
-
-[[package]]
-name = "compass"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "astrolabe",
- "clap",
- "insta",
- "lalrpop",
- "lalrpop-util",
- "logos",
-]
 
 [[package]]
 name = "concolor"
