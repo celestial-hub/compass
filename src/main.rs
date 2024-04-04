@@ -12,7 +12,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let mips_codegen = celestial_hub_compass::codegen::mips::MipsCodegen;
 
-  mips_codegen.generate(ast);
+  let result = mips_codegen.generate(ast)?;
+
+  println!("{}", result);
 
   Ok(())
 }

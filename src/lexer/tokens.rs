@@ -55,17 +55,17 @@ pub enum Token {
   Identifier(String),
 
   // Integer Literals
-  #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
-  #[regex("[0-9]+i32", |lex| lex.slice().strip_suffix("i32").unwrap().parse().ok())]
+  #[regex("[+-]?[0-9]+", |lex| lex.slice().parse().ok())]
+  #[regex("[+-]?[0-9]+i32", |lex| lex.slice().strip_suffix("i32").unwrap().parse().ok())]
   LiteralI32(i32),
 
-  #[regex("[0-9]+i8", |lex| lex.slice().strip_suffix("i8").unwrap().parse().ok())]
+  #[regex("[+-]?[0-9]+i8", |lex| lex.slice().strip_suffix("i8").unwrap().parse().ok())]
   LiteralI8(i8),
 
-  #[regex("[0-9]+i16", |lex| lex.slice().strip_suffix("i16").unwrap().parse().ok())]
+  #[regex("[+-]?[0-9]+i16", |lex| lex.slice().strip_suffix("i16").unwrap().parse().ok())]
   LiteralI16(i16),
 
-  #[regex("[0-9]+i64", |lex| lex.slice().strip_suffix("i64").unwrap().parse().ok())]
+  #[regex("[+-]?[0-9]+i64", |lex| lex.slice().strip_suffix("i64").unwrap().parse().ok())]
   LiteralI64(i64),
 
   #[regex("[0-9]+u8", |lex| lex.slice().strip_suffix("u8").unwrap().parse().ok())]

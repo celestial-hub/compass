@@ -191,6 +191,27 @@ pub enum Operand {
 }
 
 impl Operand {
+  pub fn as_identifier(&self) -> Result<&str, String> {
+    Ok(match self {
+      Operand::Identifier(name) => name,
+      _ => return Err("Expected register, found immediate".to_string()),
+    })
+  }
+
+  pub fn as_immediate(&self) -> Result<u32, String> {
+    Ok(match self {
+      Operand::LiteralI8(val) => *val as u32,
+      Operand::LiteralI16(val) => *val as u32,
+      Operand::LiteralI32(val) => *val as u32,
+      Operand::LiteralI64(val) => *val as u32,
+      Operand::LiteralU8(val) => *val as u32,
+      Operand::LiteralU16(val) => *val as u32,
+      Operand::LiteralU32(val) => *val,
+      Operand::LiteralU64(val) => *val as u32,
+      _ => return Err("Expected immediate, found register".to_string()),
+    })
+  }
+
   pub fn get_type(
     &self,
     context: &context::Context,
