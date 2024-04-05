@@ -64,6 +64,7 @@ impl Codegen for MipsCodegen {
               Operand::LiteralF32(val) => todo!(),
               Operand::LiteralF64(val) => todo!(),
               Operand::Identifier(var) => todo!(),
+              Operand::Dereference(_) => todo!(),
             },
             Expr::BinaryOperation(bin_op) => match bin_op {
               BinaryOperation::Arithmetic {
@@ -160,6 +161,36 @@ impl Codegen for MipsCodegen {
         CompassStatement::UnconditionalJump { label, location } => todo!(),
         CompassStatement::Label { name, location } => todo!(),
         CompassStatement::FunctionDefinition(_) => todo!(),
+        CompassStatement::Store { at, from, location } => match (&at, &from) {
+          (Operand::Dereference(at), Operand::Identifier(from)) => {
+            let at_register = register_map
+              .get(at)
+              .ok_or_else(|| format!("Register {} not found", at))?
+              .clone();
+            let from_register = register_map
+              .get(from)
+              .ok_or_else(|| format!("Register {} not found", from))?
+              .clone();
+
+            text_section
+              .statements
+              .push(Statement::Instruction(Instruction::Sw(
+                [
+                  InstructionArgument::Register(Register {
+                    name: from_register,
+                  }),
+                  InstructionArgument::Register(Register { name: at_register }),
+                ]
+                .into(),
+              )));
+          }
+          _ => {
+            Err(format!(
+              "Invalid operands for store operation {} and {}",
+              at, from
+            ))?;
+          }
+        },
       }
     }
 
@@ -176,14 +207,16 @@ fn find_or_create_reg(register_map: &mut HashMap<String, String>, name: String) 
   if let Some(register) = register_map.get(&name) {
     register.clone()
   } else {
-    let register = format!("${}", register_map.len());
+    let register = format!("$t{}", register_map.len());
     register_map.insert(name.clone(), register.clone());
     register
   }
 }
 
 fn new_register(register_map: &mut HashMap<String, String>) -> String {
-  let register = format!("${}", register_map.len());
+  let next_register = register_map.len();
+
+  let register = format!("$t{}", register_map.len());
   register_map.insert(register.clone(), register.clone());
   register
 }

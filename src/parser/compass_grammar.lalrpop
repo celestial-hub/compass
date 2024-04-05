@@ -26,8 +26,12 @@ extern {
     "||" => Token::Or,
     "if" => Token::If,
     "goto" => Token::Goto,
+    "load" => Token::Load,
+    "store" => Token::Store,
     "identifier" => Token::Identifier(<String>),
+    "dereference" => Token::Dereference(<String>),
     "type" => Token::Type(<String>),
+    "cast" => Token::Cast(<String>),
     "literal_i8" => Token::LiteralI8(<i8>),
     "literal_i16" => Token::LiteralI16(<i16>),
     "literal_i32" => Token::LiteralI32(<i32>),
@@ -58,6 +62,7 @@ pub Program: Vec<ast::Statement> = {
 };
 
 Statement: ast::Statement = {
+  // Variable declaration/definition
   <l1:@L> <name:"identifier"> <r1:@R> ":" <l2:@L> <var_type:"type"> <r2:@R> "=" <l3:@L> <value:Expr> <r3:@R> =>? {
 
     let variable = match value.clone() {
@@ -223,6 +228,15 @@ Statement: ast::Statement = {
         location: 0..0,
     })
   },
+
+  <l:@L> "store" <at:"dereference"> <from:"identifier"> <r:@R> => {
+    ast::Statement::Store {
+      at: ast::Operand::Dereference(at),
+      from: ast::Operand::Identifier(from),
+      location: l..r,
+    }
+  },
+
 };
 
 Return: ast::Return = {

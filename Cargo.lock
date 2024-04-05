@@ -156,9 +156,9 @@ checksum = "8cd6604a82acf3039f1144f54b8eb34e91ffba622051189e71b781822d5ee1f5"
 
 [[package]]
 name = "celestial-hub-astrolabe"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50ee5cc1dc2a8b64f2a07278e25f41488bd90d9346ee62e53662adc8f8c8c81d"
+checksum = "0f6f1027c77f615a5a69248af8b685a6b7328efdb687e39f0151189661ffd9c9"
 dependencies = [
  "ariadne",
  "clap",
@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "celestial-hub-compass"
-version = "0.1.3"
+version = "0.1.5"
 dependencies = [
  "ariadne",
  "celestial-hub-astrolabe",

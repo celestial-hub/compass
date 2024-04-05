@@ -22,6 +22,7 @@ pub enum VarType {
   F64,
   Str,
   Void,
+  Ptr,
 }
 
 impl std::fmt::Display for VarType {
@@ -40,6 +41,7 @@ impl std::fmt::Display for VarType {
       VarType::F64 => write!(f, "f64"),
       VarType::Str => write!(f, "str"),
       VarType::Void => write!(f, "void"),
+      VarType::Ptr => write!(f, "ptr"),
     }
   }
 }
@@ -61,6 +63,8 @@ impl FromStr for VarType {
       "f32" => Ok(VarType::F32),
       "f64" => Ok(VarType::F64),
       "str" => Ok(VarType::Str),
+      "ptr" => Ok(VarType::Ptr),
+      "void" => Ok(VarType::Void),
       _ => Err(format!("Invalid type: {}", s)),
     }
   }
@@ -88,6 +92,7 @@ impl From<VarType> for String {
       VarType::F64 => "f64".to_string(),
       VarType::Str => "str".to_string(),
       VarType::Void => "void".to_string(),
+      VarType::Ptr => "ptr".to_string(),
     }
   }
 }
@@ -116,6 +121,13 @@ pub enum Statement {
   },
 
   FunctionDefinition(Function),
+
+  // Store expression
+  Store {
+    at: Operand,
+    from: Operand,
+    location: Location,
+  },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -176,6 +188,7 @@ pub enum BinaryOperation {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Operand {
   Identifier(String),
+  Dereference(String),
   LiteralStr(String),
   LiteralBool(bool),
   LiteralI8(i8),
@@ -245,6 +258,7 @@ impl Operand {
       Operand::LiteralBool(_) => Ok(VarType::Bool),
       Operand::LiteralF32(_) => Ok(VarType::F32),
       Operand::LiteralF64(_) => Ok(VarType::F64),
+      Operand::Dereference(_) => Ok(VarType::Ptr),
     }
   }
 }
@@ -267,6 +281,7 @@ impl TryFrom<Operand> for VarType {
       Operand::LiteralBool(_) => Ok(VarType::Bool),
       Operand::LiteralF32(_) => Ok(VarType::F32),
       Operand::LiteralF64(_) => Ok(VarType::F64),
+      Operand::Dereference(_) => Ok(VarType::Ptr),
     }
   }
 }
@@ -287,6 +302,7 @@ impl std::fmt::Display for Operand {
       Operand::LiteralU64(value) => write!(f, "{}", value),
       Operand::LiteralF32(value) => write!(f, "{}", value),
       Operand::LiteralF64(value) => write!(f, "{}", value),
+      Operand::Dereference(value) => write!(f, "*{}", value),
     }
   }
 }
