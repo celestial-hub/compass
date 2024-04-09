@@ -29,6 +29,18 @@ pub enum LexicalError {
     error: Vec<ErrorTip>,
     help: Option<String>,
   },
+  UnknownFunction {
+    error: Vec<ErrorTip>,
+    help: Option<String>,
+  },
+  WrongArgumentCount {
+    error: Vec<ErrorTip>,
+    help: Option<String>,
+  },
+  FunctionIsBuiltin {
+    error: Vec<ErrorTip>,
+    help: Option<String>,
+  },
 }
 
 impl<'input> Lexer<'input> {

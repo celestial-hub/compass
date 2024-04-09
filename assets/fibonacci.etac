@@ -1,8 +1,4 @@
-func funcao()
-begin
-end
-
-func fibonacci(param N: i32): i32
+func fibonacci(N: i32): i32
 begin
     # Initial conditions
     a: i32 = 0

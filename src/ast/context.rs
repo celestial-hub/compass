@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 
-use super::{Statement, Variable};
+use crate::ast::{Argument, VarType};
+
+use super::{Function, Statement, Variable};
 
 // A struct to hold the context of the parser.
 #[derive(Debug)]
@@ -11,6 +13,9 @@ pub struct Context {
   pub scope_level: usize,
   // A hash map of the variables by scope level in the parser.
   pub variables: HashMap<usize, Vec<Variable>>,
+
+  /// Function definitions
+  pub functions: HashMap<String, Function>,
 }
 
 impl Context {
@@ -18,6 +23,7 @@ impl Context {
     Self {
       scope_level: 0,
       variables: HashMap::new(),
+      functions: HashMap::new(),
     }
   }
 
@@ -51,6 +57,41 @@ impl Context {
     }
 
     None
+  }
+
+  pub fn add_function(&mut self, function: &Function) -> Result<(), String> {
+    if self.functions.contains_key(&function.name) {
+      return Err(format!("Function `{}` already defined", function.name));
+    }
+
+    self
+      .functions
+      .insert(function.name.clone(), function.clone());
+
+    Ok(())
+  }
+
+  pub fn get_function(&self, name: &str) -> Option<Function> {
+    self
+      .builtins()
+      .iter()
+      .find(|f| f.name == name)
+      .cloned()
+      .or_else(|| self.functions.get(name).cloned())
+  }
+
+  fn builtins(&self) -> Vec<Function> {
+    vec![Function {
+      name: "write_string".to_string(),
+      body: vec![],
+      args: vec![Argument {
+        name: "message".to_string(),
+        var_type: VarType::Str,
+      }],
+      return_type: VarType::Void,
+      location: 0..0,
+      is_builtin: true,
+    }]
   }
 }
 

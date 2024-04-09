@@ -6,7 +6,9 @@ use celestial_hub_astrolabe::{
   lexer::tokens::{Type, Value},
 };
 
-use crate::ast::{BinaryOperation, Expr, Operand, Operator, Statement as CompassStatement};
+use crate::ast::{
+  BinaryOperation, Condition, Expr, Operand, Operator, Statement as CompassStatement, VarType,
+};
 use std::collections::HashMap;
 
 use super::Codegen;
@@ -148,7 +150,68 @@ impl Codegen for MipsCodegen {
                 condition,
                 rhs,
                 operation_type,
-              } => todo!(),
+              } => {
+                if operation_type != VarType::Bool {
+                  return Err("Conditional operations must be of type bool".to_string());
+                }
+
+                if is_register(&lhs) && is_register(&rhs) {
+                  let lhs = lhs.as_identifier()?;
+                  let rhs = rhs.as_identifier()?;
+
+                  let lhs_register = register_map
+                    .get(lhs)
+                    .ok_or_else(|| format!("Register {} not found", lhs))?
+                    .clone();
+                  let rhs_register = register_map
+                    .get(rhs)
+                    .ok_or_else(|| format!("Register {} not found", rhs))?
+                    .clone();
+
+                  text_section.statements.push(match condition {
+                    Condition::LessThan => {
+                      create_instruction!(
+                        Instruction::Slt,
+                        register,
+                        lhs_register,
+                        InstructionArgument::Register(Register { name: rhs_register })
+                      )
+                    }
+                    Condition::GreaterThan => todo!(),
+                    Condition::LessThanOrEqual => todo!(),
+                    Condition::GreaterThanOrEqual => todo!(),
+                    Condition::Equal => todo!(),
+                    Condition::NotEqual => todo!(),
+                    Condition::And => todo!(),
+                    Condition::Or => todo!(),
+                  });
+                } else if is_register(&lhs) && is_immediate(&rhs) {
+                  let lhs = lhs.as_identifier()?;
+                  let lhs_register = register_map
+                    .get(lhs)
+                    .ok_or_else(|| format!("Register {} not found", lhs))?
+                    .clone();
+                  let rhs_value = rhs.as_immediate()?;
+
+                  text_section.statements.push(match condition {
+                    Condition::LessThan => {
+                      create_instruction!(
+                        Instruction::Slt,
+                        register,
+                        lhs_register,
+                        InstructionArgument::Immediate(rhs_value)
+                      )
+                    }
+                    Condition::GreaterThan => todo!(),
+                    Condition::LessThanOrEqual => todo!(),
+                    Condition::GreaterThanOrEqual => todo!(),
+                    Condition::Equal => todo!(),
+                    Condition::NotEqual => todo!(),
+                    Condition::And => todo!(),
+                    Condition::Or => todo!(),
+                  });
+                }
+              }
             },
             crate::ast::Expr::FunctionCall(_) => todo!(),
           }
@@ -157,9 +220,130 @@ impl Codegen for MipsCodegen {
           condition,
           label,
           location,
-        } => todo!(),
-        CompassStatement::UnconditionalJump { label, location } => todo!(),
-        CompassStatement::Label { name, location } => todo!(),
+        } => match condition {
+          Expr::BinaryOperation(op) => match op {
+            BinaryOperation::Conditional {
+              ref lhs,
+              ref condition,
+              ref rhs,
+              operation_type,
+            } => {
+              if operation_type != VarType::Bool {
+                return Err("Conditional operations must be of type bool".to_string());
+              }
+
+              if is_register(&lhs) && is_register(&rhs) {
+                let lhs = lhs.as_identifier()?;
+                let rhs = rhs.as_identifier()?;
+
+                let lhs_register = register_map
+                  .get(lhs)
+                  .ok_or_else(|| format!("Register {} not found", lhs))?
+                  .clone();
+                let rhs_register = register_map
+                  .get(rhs)
+                  .ok_or_else(|| format!("Register {} not found", rhs))?
+                  .clone();
+
+                let condition_instruction = match condition {
+                  Condition::LessThan => Instruction::Blt,
+                  Condition::GreaterThan => Instruction::Bgt,
+                  Condition::LessThanOrEqual => Instruction::Ble,
+                  Condition::GreaterThanOrEqual => Instruction::Bge,
+                  Condition::Equal => Instruction::Beq,
+                  Condition::NotEqual => Instruction::Bne,
+                  _ => Err(format!(
+                    "Invalid binary operation for conditional jump {op:?}",
+                  ))?,
+                };
+
+                text_section.statements.push(create_instruction!(
+                  condition_instruction,
+                  lhs_register,
+                  rhs_register,
+                  InstructionArgument::Label(label)
+                ));
+              } else if is_register(&lhs) && is_immediate(&rhs) {
+                let lhs = lhs.as_identifier()?;
+                let lhs_register = register_map
+                  .get(lhs)
+                  .ok_or_else(|| format!("Register {} not found", lhs))?
+                  .clone();
+                let rhs_value = rhs.as_immediate()?;
+
+                let condition_instruction = match condition {
+                  Condition::LessThan => Instruction::Blt,
+                  Condition::GreaterThan => Instruction::Bgt,
+                  Condition::LessThanOrEqual => Instruction::Ble,
+                  Condition::GreaterThanOrEqual => Instruction::Bge,
+                  Condition::Equal => Instruction::Beq,
+                  Condition::NotEqual => Instruction::Bne,
+                  _ => Err(format!(
+                    "Invalid binary operation for conditional jump {op:?}",
+                  ))?,
+                };
+
+                text_section
+                  .statements
+                  .push(Statement::Instruction(condition_instruction(
+                    [
+                      InstructionArgument::Register(Register { name: lhs_register }),
+                      InstructionArgument::Immediate(rhs_value),
+                      InstructionArgument::Label(label),
+                    ]
+                    .into(),
+                  )));
+              }
+            }
+            _ => Err(format!(
+              "Invalid binary operation for conditional jump {op:?}",
+            ))?,
+          },
+          Expr::Operand(op) => match op {
+            Operand::Identifier(ident) => {
+              let register = register_map
+                .get(&ident)
+                .ok_or_else(|| format!("Register {} not found", ident))?
+                .clone();
+
+              text_section
+                .statements
+                .push(Statement::Instruction(Instruction::Beqz(
+                  [
+                    InstructionArgument::Register(Register {
+                      name: register.clone(),
+                    }),
+                    InstructionArgument::Label(label),
+                  ]
+                  .into(),
+                )));
+            }
+            Operand::LiteralBool(value) => match value {
+              true => text_section
+                .statements
+                .push(Statement::Instruction(Instruction::J(
+                  [InstructionArgument::Label(label)].into(),
+                ))),
+              false => (),
+            },
+            _ => Err(format!("Invalid operand for conditional jump {}", op))?,
+          },
+          Expr::FunctionCall(_) => unreachable!(),
+        },
+        CompassStatement::UnconditionalJump { label, location } => {
+          text_section
+            .statements
+            .push(Statement::Instruction(Instruction::J(
+              [InstructionArgument::Label(label)].into(),
+            )));
+        }
+        CompassStatement::Label { name, location } => {
+          if name == "main" {
+            return Err("Cannot use 'main' as a label name".to_string());
+          }
+
+          text_section.statements.push(Statement::Label(name))
+        }
         CompassStatement::FunctionDefinition(_) => todo!(),
         CompassStatement::Store { at, from, location } => match (&at, &from) {
           (Operand::Dereference(at), Operand::Identifier(from)) => {
@@ -191,6 +375,13 @@ impl Codegen for MipsCodegen {
             ))?;
           }
         },
+        CompassStatement::NoOperation => {}
+        CompassStatement::Call {
+          name,
+          params,
+          return_type,
+          location,
+        } => todo!(),
       }
     }
 

@@ -156,9 +156,7 @@ checksum = "8cd6604a82acf3039f1144f54b8eb34e91ffba622051189e71b781822d5ee1f5"
 
 [[package]]
 name = "celestial-hub-astrolabe"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f6f1027c77f615a5a69248af8b685a6b7328efdb687e39f0151189661ffd9c9"
+version = "0.1.6"
 dependencies = [
  "ariadne",
  "clap",
@@ -166,6 +164,7 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "logos",
+ "serde",
 ]
 
 [[package]]

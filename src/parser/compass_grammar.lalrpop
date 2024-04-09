@@ -28,6 +28,7 @@ extern {
     "goto" => Token::Goto,
     "load" => Token::Load,
     "store" => Token::Store,
+    "call" => Token::Call,
     "identifier" => Token::Identifier(<String>),
     "dereference" => Token::Dereference(<String>),
     "type" => Token::Type(<String>),
@@ -120,11 +121,11 @@ Statement: ast::Statement = {
             }
 
             ast::Statement::VariableDeclaration(ast::Variable {
-                name,
-                var_type,
-                value,
-                location: 0..0,
-                })
+              name,
+              var_type,
+              value,
+              location: 0..0,
+            })
           },
         }
       },
@@ -192,11 +193,104 @@ Statement: ast::Statement = {
     Ok(variable)
   },
 
-  "if" <condition:Expr> "goto" <label:"identifier"> => {
-    ast::Statement::ConditionalJump {
-      condition,
-      label,
-      location: 0..0,
+  <l0:@L> "if" <r0:@R> <l1:@L> <condition:Expr> <r1:@R> "goto" <l2:@L> <label:"identifier"> <r2:@R> =>? {
+    match condition {
+      Expr::Operand(operand) => {
+        match operand {
+          Operand::LiteralBool(value) => {
+            if value {
+              Ok(ast::Statement::UnconditionalJump {
+                label,
+                location: l1..r2,
+              })
+            } else {
+              Ok(ast::Statement::NoOperation)
+            }
+          },
+          Operand::Identifier(ident) => {
+            let variable = context.get_variable(ident.clone()).ok_or(ParseError::User { error: LexicalError::UnknownVariable {
+              error: vec![
+                ErrorTip { message: format!("unknown variable `{}`", ident), location: l1..r1 },
+              ],
+              help: None
+            }})?;
+
+            if variable.var_type != VarType::Bool {
+              return Err(ParseError::User { error: LexicalError::WrongType {
+                error: vec![
+                  ErrorTip { message: "expected `bool`".into(), location: l0..r0 },
+                  ErrorTip { message: format!("found `{}`", Into::<String>::into(variable.var_type)), location: l1..r1 },
+                ],
+                help: Some(
+                  "You can either try to cast the value to `bool` or change the variable type to `bool`".to_string()
+                ),
+              }});
+            }
+
+            Ok(ast::Statement::ConditionalJump {
+              condition: ast::Expr::Operand(ast::Operand::Identifier(ident)),
+              label,
+              location: l1..r2,
+            })
+          },
+          _ => {
+            return Err(ParseError::User { error: LexicalError::WrongType {
+              error: vec![
+                ErrorTip { message: "expected `bool`".into(), location: l0..r0 },
+                ErrorTip { message: format!("found `{}`", Into::<String>::into(operand.get_type(context, l1..r1)?)), location: l1..r1 },
+              ],
+              help: Some(
+                "You can either try to cast the value to `bool` or change the variable type to `bool`".to_string()
+              ),
+            }});
+          },
+        }
+      },
+      Expr::BinaryOperation(op) => {
+        match op {
+          ast::BinaryOperation::Conditional { operation_type, .. } => {
+            if operation_type != VarType::Bool {
+              return Err(ParseError::User { error: LexicalError::WrongType {
+                error: vec![
+                  ErrorTip { message: "expected `bool`".into(), location: l0..r0 },
+                  ErrorTip { message: format!("found `{}`", Into::<String>::into(operation_type)), location: l1..r1 },
+                ],
+                help: Some(
+                  "You can either try to cast the value to `bool` or change the variable type to `bool`".to_string()
+                ),
+              }});
+            }
+
+            Ok(ast::Statement::ConditionalJump {
+              condition: ast::Expr::BinaryOperation(op),
+              label,
+              location: l1..r2,
+            })
+          },
+          ast::BinaryOperation::Arithmetic { operation_type, .. } => {
+            return Err(ParseError::User { error: LexicalError::WrongType {
+              error: vec![
+                ErrorTip { message: "expected `bool`".into(), location: l0..r0 },
+                ErrorTip { message: format!("found `{}`", Into::<String>::into(operation_type)), location: l1..r1 },
+              ],
+              help: Some(
+                "You can either try to cast the value to `bool` or change the binary operation type to a `comparison`".to_string()
+              ),
+            }});
+          },
+        }
+      },
+      _ => {
+        return Err(ParseError::User { error: LexicalError::WrongType {
+          error: vec![
+            ErrorTip { message: "expected `bool`".into(), location: l1..r1 },
+            ErrorTip { message: format!("found `{:?}`", condition), location: l1..r1 },
+          ],
+          help: Some(
+            "You can either try to cast the value to `bool` or change the variable type to `bool`".to_string()
+          ),
+        }});
+      }
     }
   },
 
@@ -214,19 +308,29 @@ Statement: ast::Statement = {
     }
   },
 
-  "func" <name:"identifier"> "(" <args:Arguments> ")" <return_type:Return?> "begin" <body:Statement*> "end" => {
+  "func" <l1:@L> <name:"identifier"> <r1:@R> "(" <args:Arguments> ")" <return_type:Return?> "begin" <body:Statement*> "end" =>? {
     let return_type = match return_type {
       Some(return_type) => return_type.var_type,
       None => VarType::Void,
     };
 
-    ast::Statement::FunctionDefinition(ast::Function {
+    let function = ast::Function {
         name,
         args,
         return_type,
         body,
-        location: 0..0,
-    })
+        location: l1..r1,
+        is_builtin: false,
+    };
+
+    context.add_function(&function).map_err(|error| ParseError::User { error: LexicalError::FunctionIsBuiltin {
+      error: vec![
+        ErrorTip { message: format!("function `{}` is already defined", function.name), location: l1..r1 },
+      ],
+      help: Some(format!("You can either try to change the function name or remove the function definition"))
+    }})?;
+
+    Ok(ast::Statement::FunctionDefinition(function))
   },
 
   <l:@L> "store" <at:"dereference"> <from:"identifier"> <r:@R> => {
@@ -236,6 +340,56 @@ Statement: ast::Statement = {
       location: l..r,
     }
   },
+
+  <l:@L> "call" <r:@R> <l1:@L> <name:"identifier"> <r1:@R> "(" <l2:@L> <params:Parameters> <r2:@R> ")" =>? {
+    let function = context.get_function(&name).ok_or(ParseError::User { error: LexicalError::UnknownFunction {
+      error: vec![
+        ErrorTip { message: format!("unknown function `{}`", name), location: l1..r1 },
+      ],
+      help: None
+    }})?;
+
+    if function.args.len() != params.len() {
+      return Err(ParseError::User { error: LexicalError::WrongArgumentCount {
+        error: vec![
+          ErrorTip { message: format!("expected `{}` arguments", function.args.len()), location: l1..r1 },
+          ErrorTip { message: format!("found `{}` arguments", params.len()), location: l1..r1 },
+        ],
+        help: Some(
+          format!(
+            "You can either try to cast the value to `{}` or change the variable type to `{}`",
+            function.args.len(),
+            params.len()
+          )
+        ),
+      }});
+    }
+
+    for (i, (arg, param)) in function.args.iter().zip(params.iter()).enumerate() {
+      if arg.var_type != param.get_type(context, l2..r2)? {
+        return Err(ParseError::User { error: LexicalError::WrongType {
+          error: vec![
+            ErrorTip { message: format!("expected {i}th argument to be `{}`", Into::<String>::into(arg.var_type)), location: l1..r1 },
+            ErrorTip { message: format!("found `{}`", Into::<String>::into(param.get_type(context, l2..r2)?)), location: l2..r2 },
+          ],
+          help: Some(
+            format!(
+              "You can either try to cast the value to `{}` or change the variable type to `{}`",
+              Into::<String>::into(arg.var_type),
+              Into::<String>::into(param.get_type(context, l2..r2)?)
+            )
+          ),
+        }});
+      }
+    }
+
+    Ok(ast::Statement::Call {
+      name,
+      params,
+      return_type: function.return_type,
+      location: l..r,
+    })
+  }
 
 };
 
@@ -256,6 +410,10 @@ Argument: ast::Argument = {
       var_type: var_type.into(),
     }
   },
+};
+
+Parameters: Vec<ast::Operand> = {
+  <params:Operand*> => params
 };
 
 BinaryOperation: ast::BinaryOperation = {
@@ -289,6 +447,7 @@ BinaryOperation: ast::BinaryOperation = {
       operation_type: lhs_type,
     })
   },
+
   <l1:@L> <lhs:Operand> <r1:@R> <condition:Condition> <l2:@L> <rhs:Operand> <r2:@R> =>? {
     let lhs_type = lhs.clone().get_type(context, l1..r1)?;
     let rhs_type = rhs.clone().get_type(context, l2..r2)?;

@@ -128,6 +128,15 @@ pub enum Statement {
     from: Operand,
     location: Location,
   },
+
+  Call {
+    name: String,
+    params: Vec<Operand>,
+    return_type: VarType,
+    location: Location,
+  },
+
+  NoOperation,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -145,6 +154,7 @@ pub struct Function {
   pub args: Vec<Argument>,
   pub body: Vec<Statement>,
   pub return_type: VarType,
+  pub is_builtin: bool,
 }
 
 // Expressions are statements that return a value, such as

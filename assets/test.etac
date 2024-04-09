@@ -1,6 +1,16 @@
-t0: i8 = 1i8
-p1: i32 = 0x10
-store *p1 t0
-# t0: i8 = t0 + 2i8
-# t1: i32 = 5 + 10
-# t2: i32 = t1 + 2
+func test(a: i32) begin
+  t1: i32 = 0
+end
+
+t1: i32 = 0
+
+start:
+  t1: i32 = t1 + 1          # Increment t1
+  # t2: i32 = t1 + 10
+  if t1 < 10 goto start          # Continue loop if t1 is less than 10
+  goto done
+
+done:
+  t2: str = "awesome!"
+  call write_string(t2)
+  call test(t2)

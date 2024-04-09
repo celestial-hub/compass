@@ -22,6 +22,33 @@ impl std::fmt::Display for LexicalError {
           None => Ok(()),
         }
       }
+      LexicalError::UnknownFunction { error, help } => {
+        for lexer::ErrorTip { message, location } in error {
+          writeln!(f, "error: {message:?} at {location:?}")?;
+        }
+        match help {
+          Some(help) => writeln!(f, "help: {help:?}"),
+          None => Ok(()),
+        }
+      }
+      LexicalError::WrongArgumentCount { error, help } => {
+        for lexer::ErrorTip { message, location } in error {
+          writeln!(f, "error: {message:?} at {location:?}")?;
+        }
+        match help {
+          Some(help) => writeln!(f, "help: {help:?}"),
+          None => Ok(()),
+        }
+      }
+      LexicalError::FunctionIsBuiltin { error, help } => {
+        for lexer::ErrorTip { message, location } in error {
+          writeln!(f, "error: {message:?} at {location:?}")?;
+        }
+        match help {
+          Some(help) => writeln!(f, "help: {help:?}"),
+          None => Ok(()),
+        }
+      }
     }
   }
 }

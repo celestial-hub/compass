@@ -66,6 +66,8 @@ pub enum Token {
   End,
   #[token("return")]
   Return,
+  #[token("call")]
+  Call,
 
   // Functions
   #[token("load")]
