@@ -1,6 +1,10 @@
 use clap::Args;
 
-use crate::{ast::Statement, lexer::Lexer, parser::Parser};
+use crate::{
+  ast::{context::Context, Statement},
+  lexer::Lexer,
+  parser::Parser,
+};
 
 #[derive(Args)]
 pub struct EmitASTOptions {

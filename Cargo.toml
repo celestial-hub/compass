@@ -1,7 +1,7 @@
 [package]
 name = "celestial-hub-compass"
 description = "A simple ETAC compiler"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 license = "MIT"
 
@@ -14,8 +14,8 @@ logos = { version = "0.13", features = ["logos-derive"] }
 ariadne = { version = "0.3.0", features = ["auto-color"] }
 lalrpop-util = { version = "0.20.0", features = ["lexer", "unicode"] }
 clap = { version = "4.4.7", features = ["derive", "unicode"] }
-celestial-hub-astrolabe = { version = "0.1", path = "../astrolabe/" }
-# celestial-hub-astrolabe = "0.1"
+# celestial-hub-astrolabe = { version = "0.1", path = "../astrolabe/" }
+celestial-hub-astrolabe = "0.1"
 
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["yaml"] }

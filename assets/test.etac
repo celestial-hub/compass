@@ -1,16 +1,9 @@
-func test(a: i32) begin
-  t1: i32 = 0
-end
-
 t1: i32 = 0
-
 start:
-  t1: i32 = t1 + 1          # Increment t1
-  # t2: i32 = t1 + 10
-  if t1 < 10 goto start          # Continue loop if t1 is less than 10
+  t1: i32 = t1 + 1
+  if t1 < 10 goto start
   goto done
 
 done:
-  t2: str = "awesome!"
+  t2: str = "done!"
   call write_string(t2)
-  call test(t2)

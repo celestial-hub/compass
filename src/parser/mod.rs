@@ -32,8 +32,13 @@ impl Parser {
           "github.com/celestial-hub/compass/issues".fg(Color::Blue)
         ));
 
-    match compass_grammar::ProgramParser::new().parse(&mut Context::default(), lexer) {
-      Ok(ast) => Ok(ast),
+    let mut context = Context::default();
+    match compass_grammar::ProgramParser::new().parse(&mut context, lexer) {
+      Ok(ast) => {
+        println!("{:#?}", context);
+        // I should probably use this context in the codegen module
+        Ok(ast)
+      }
       Err(err) => match err {
         ParseError::InvalidToken { location } => {
           report

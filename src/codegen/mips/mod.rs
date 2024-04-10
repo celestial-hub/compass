@@ -7,11 +7,12 @@ use celestial_hub_astrolabe::{
 };
 
 use crate::ast::{
-  BinaryOperation, Condition, Expr, Operand, Operator, Statement as CompassStatement, VarType,
+  context, BinaryOperation, Condition, Expr, Function, Operand, Operator,
+  Statement as CompassStatement, VarType,
 };
 use std::collections::HashMap;
 
-use super::Codegen;
+use super::{context::Context, Codegen};
 
 pub struct MipsCodegen;
 
@@ -31,36 +32,48 @@ macro_rules! create_instruction {
 }
 
 impl Codegen for MipsCodegen {
-  fn generate(&self, ast: Vec<CompassStatement>) -> Result<String, String> {
-    let mut data_section = DataSection::default();
-    let mut text_section = TextSection {
-      entrypoint: "main".to_string(),
-      ..Default::default()
-    };
-
-    let mut register_counter = 0;
-    let mut register_map: std::collections::HashMap<String, String> =
-      std::collections::HashMap::new();
+  fn generate(&self, ast: Vec<CompassStatement>, context: &mut Context) -> Result<String, String> {
+    if context.scope_level == 0 {
+      context
+        .text_section
+        .statements
+        .push(Statement::Label("main".to_string()));
+    }
 
     for statement in ast {
       match statement {
         CompassStatement::VariableDeclaration(var) => {
-          let register = find_or_create_reg(&mut register_map, var.name.clone());
+          let register = find_or_create_reg(&mut context.register_map, var.name.clone());
 
           match var.value {
             Expr::Operand(op) => match op {
-              Operand::LiteralI8(val) => load_immediate(&mut text_section, register, val as u32),
-              Operand::LiteralI16(val) => load_immediate(&mut text_section, register, val as u32),
-              Operand::LiteralI32(val) => load_immediate(&mut text_section, register, val as u32),
-              Operand::LiteralI64(val) => load_immediate(&mut text_section, register, val as u32),
-              Operand::LiteralU8(val) => load_immediate(&mut text_section, register, val as u32),
-              Operand::LiteralU16(val) => load_immediate(&mut text_section, register, val as u32),
-              Operand::LiteralU32(val) => load_immediate(&mut text_section, register, val),
+              Operand::LiteralI8(val) => {
+                load_immediate(&mut context.text_section, register, val as u32)
+              }
+              Operand::LiteralI16(val) => {
+                load_immediate(&mut context.text_section, register, val as u32)
+              }
+              Operand::LiteralI32(val) => {
+                load_immediate(&mut context.text_section, register, val as u32)
+              }
+              Operand::LiteralI64(val) => {
+                load_immediate(&mut context.text_section, register, val as u32)
+              }
+              Operand::LiteralU8(val) => {
+                load_immediate(&mut context.text_section, register, val as u32)
+              }
+              Operand::LiteralU16(val) => {
+                load_immediate(&mut context.text_section, register, val as u32)
+              }
+              Operand::LiteralU32(val) => load_immediate(&mut context.text_section, register, val),
+              Operand::LiteralStr(val) => load_string(
+                &mut context.text_section,
+                &mut context.data_section,
+                register,
+                val,
+              ),
               Operand::LiteralU64(val) => {
                 return Err("Cannot store a 64-bit integer in a 32-bit register".to_string());
-              }
-              Operand::LiteralStr(val) => {
-                load_string(&mut text_section, &mut data_section, register, val)
               }
               Operand::LiteralBool(val) => todo!(),
               Operand::LiteralF32(val) => todo!(),
@@ -76,16 +89,18 @@ impl Codegen for MipsCodegen {
                   let lhs = lhs.as_identifier()?;
                   let rhs = rhs.as_identifier()?;
 
-                  let lhs_register = register_map
+                  let lhs_register = context
+                    .register_map
                     .get(lhs)
                     .ok_or_else(|| format!("Register {} not found", lhs))?
                     .clone();
-                  let rhs_register = register_map
+                  let rhs_register = context
+                    .register_map
                     .get(rhs)
                     .ok_or_else(|| format!("Register {} not found", rhs))?
                     .clone();
 
-                  text_section.statements.push(match operator {
+                  context.text_section.statements.push(match operator {
                     Operator::Add => create_instruction!(
                       Instruction::Add,
                       register,
@@ -103,13 +118,14 @@ impl Codegen for MipsCodegen {
                   });
                 } else if is_register(&lhs) && is_immediate(&rhs) {
                   let lhs = lhs.as_identifier()?;
-                  let lhs_register = register_map
+                  let lhs_register = context
+                    .register_map
                     .get(lhs)
                     .ok_or_else(|| format!("Register {} not found", lhs))?
                     .clone();
                   let rhs_value = rhs.as_immediate()?;
 
-                  text_section.statements.push(match operator {
+                  context.text_section.statements.push(match operator {
                     Operator::Add => create_instruction!(
                       Instruction::Addi,
                       register,
@@ -124,10 +140,10 @@ impl Codegen for MipsCodegen {
                   let lhs_value = lhs.as_immediate()?;
 
                   // There is no instruction that can add two immediates, so we need to load one of them into a register first
-                  let lhs_register = new_register(&mut register_map);
-                  load_immediate(&mut text_section, lhs_register.clone(), lhs_value);
+                  let lhs_register = new_register(&mut context.register_map);
+                  load_immediate(&mut context.text_section, lhs_register.clone(), lhs_value);
 
-                  text_section.statements.push(match operator {
+                  context.text_section.statements.push(match operator {
                     Operator::Add => create_instruction!(
                       Instruction::Addi,
                       register,
@@ -159,16 +175,18 @@ impl Codegen for MipsCodegen {
                   let lhs = lhs.as_identifier()?;
                   let rhs = rhs.as_identifier()?;
 
-                  let lhs_register = register_map
+                  let lhs_register = context
+                    .register_map
                     .get(lhs)
                     .ok_or_else(|| format!("Register {} not found", lhs))?
                     .clone();
-                  let rhs_register = register_map
+                  let rhs_register = context
+                    .register_map
                     .get(rhs)
                     .ok_or_else(|| format!("Register {} not found", rhs))?
                     .clone();
 
-                  text_section.statements.push(match condition {
+                  context.text_section.statements.push(match condition {
                     Condition::LessThan => {
                       create_instruction!(
                         Instruction::Slt,
@@ -187,13 +205,14 @@ impl Codegen for MipsCodegen {
                   });
                 } else if is_register(&lhs) && is_immediate(&rhs) {
                   let lhs = lhs.as_identifier()?;
-                  let lhs_register = register_map
+                  let lhs_register = context
+                    .register_map
                     .get(lhs)
                     .ok_or_else(|| format!("Register {} not found", lhs))?
                     .clone();
                   let rhs_value = rhs.as_immediate()?;
 
-                  text_section.statements.push(match condition {
+                  context.text_section.statements.push(match condition {
                     Condition::LessThan => {
                       create_instruction!(
                         Instruction::Slt,
@@ -236,11 +255,13 @@ impl Codegen for MipsCodegen {
                 let lhs = lhs.as_identifier()?;
                 let rhs = rhs.as_identifier()?;
 
-                let lhs_register = register_map
+                let lhs_register = context
+                  .register_map
                   .get(lhs)
                   .ok_or_else(|| format!("Register {} not found", lhs))?
                   .clone();
-                let rhs_register = register_map
+                let rhs_register = context
+                  .register_map
                   .get(rhs)
                   .ok_or_else(|| format!("Register {} not found", rhs))?
                   .clone();
@@ -257,7 +278,7 @@ impl Codegen for MipsCodegen {
                   ))?,
                 };
 
-                text_section.statements.push(create_instruction!(
+                context.text_section.statements.push(create_instruction!(
                   condition_instruction,
                   lhs_register,
                   rhs_register,
@@ -265,7 +286,8 @@ impl Codegen for MipsCodegen {
                 ));
               } else if is_register(&lhs) && is_immediate(&rhs) {
                 let lhs = lhs.as_identifier()?;
-                let lhs_register = register_map
+                let lhs_register = context
+                  .register_map
                   .get(lhs)
                   .ok_or_else(|| format!("Register {} not found", lhs))?
                   .clone();
@@ -283,16 +305,16 @@ impl Codegen for MipsCodegen {
                   ))?,
                 };
 
-                text_section
-                  .statements
-                  .push(Statement::Instruction(condition_instruction(
+                context.text_section.statements.push(Statement::Instruction(
+                  condition_instruction(
                     [
                       InstructionArgument::Register(Register { name: lhs_register }),
                       InstructionArgument::Immediate(rhs_value),
                       InstructionArgument::Label(label),
                     ]
                     .into(),
-                  )));
+                  ),
+                ));
               }
             }
             _ => Err(format!(
@@ -301,12 +323,14 @@ impl Codegen for MipsCodegen {
           },
           Expr::Operand(op) => match op {
             Operand::Identifier(ident) => {
-              let register = register_map
+              let register = context
+                .register_map
                 .get(&ident)
                 .ok_or_else(|| format!("Register {} not found", ident))?
                 .clone();
 
-              text_section
+              context
+                .text_section
                 .statements
                 .push(Statement::Instruction(Instruction::Beqz(
                   [
@@ -319,7 +343,8 @@ impl Codegen for MipsCodegen {
                 )));
             }
             Operand::LiteralBool(value) => match value {
-              true => text_section
+              true => context
+                .text_section
                 .statements
                 .push(Statement::Instruction(Instruction::J(
                   [InstructionArgument::Label(label)].into(),
@@ -331,7 +356,8 @@ impl Codegen for MipsCodegen {
           Expr::FunctionCall(_) => unreachable!(),
         },
         CompassStatement::UnconditionalJump { label, location } => {
-          text_section
+          context
+            .text_section
             .statements
             .push(Statement::Instruction(Instruction::J(
               [InstructionArgument::Label(label)].into(),
@@ -342,21 +368,51 @@ impl Codegen for MipsCodegen {
             return Err("Cannot use 'main' as a label name".to_string());
           }
 
-          text_section.statements.push(Statement::Label(name))
+          context.text_section.statements.push(Statement::Label(name))
         }
-        CompassStatement::FunctionDefinition(_) => todo!(),
+        CompassStatement::FunctionDefinition(function) => {
+          let name = format!("__{name}", name = function.name.clone());
+
+          context.function_map.insert(name.clone(), function.clone());
+
+          // Function declarations should be added before the `main: flow`
+          let statements = vec![Statement::Label(name)];
+
+          // TODO: Insert variables into the scope
+
+          let mut save_statements = context.text_section.statements.clone();
+          context.text_section.statements = statements;
+          context.scope_level += 1;
+          self.generate(function.body, context)?;
+          context.scope_level -= 1;
+
+          context
+            .text_section
+            .statements
+            .push(Statement::Instruction(Instruction::Jr(
+              [InstructionArgument::Register(Register {
+                name: "$ra".to_string(),
+              })]
+              .into(),
+            )));
+
+          context.text_section.statements.append(&mut save_statements);
+        }
         CompassStatement::Store { at, from, location } => match (&at, &from) {
           (Operand::Dereference(at), Operand::Identifier(from)) => {
-            let at_register = register_map
+            let at_register = context
+              .register_map
               .get(at)
               .ok_or_else(|| format!("Register {} not found", at))?
               .clone();
-            let from_register = register_map
+            let from_register = context
+              .register_map
               .get(from)
               .ok_or_else(|| format!("Register {} not found", from))?
               .clone();
 
-            text_section
+            context
+              .text_section
               .statements
               .push(Statement::Instruction(Instruction::Sw(
                 [
@@ -381,17 +437,151 @@ impl Codegen for MipsCodegen {
           params,
           return_type,
           location,
-        } => todo!(),
+        } => {
+          let function = context
+            .get_function(&name)
+            .ok_or_else(|| format!("Function {} not found", name))?;
+
+          if function.is_builtin {
+            match function.name.as_str() {
+              "write_string" => {
+                // Perform the write_string syscall (v0 = 4, a0 = string address)
+                context
+                  .text_section
+                  .statements
+                  .push(Statement::Instruction(Instruction::Li(
+                    [
+                      InstructionArgument::Register(Register {
+                        name: "$v0".to_string(),
+                      }),
+                      InstructionArgument::Immediate(4),
+                    ]
+                    .into(),
+                  )));
+
+                let string_register = match &params[0] {
+                  Operand::Identifier(ident) => context
+                    .register_map
+                    .get(ident)
+                    .ok_or_else(|| format!("Register {} not found", ident))?
+                    .clone(),
+                  Operand::LiteralStr(str) => {
+                    let register = new_register(&mut context.register_map);
+                    load_string(
+                      &mut context.text_section,
+                      &mut context.data_section,
+                      register.clone(),
+                      str.clone(),
+                    );
+
+                    register
+                  }
+                  _ => todo!(),
+                };
+
+                context
+                  .text_section
+                  .statements
+                  .push(Statement::Instruction(Instruction::Move(
+                    [
+                      InstructionArgument::Register(Register {
+                        name: "$a0".to_string(),
+                      }),
+                      InstructionArgument::Register(Register {
+                        name: string_register,
+                      }),
+                    ]
+                    .into(),
+                  )));
+
+                context
+                  .text_section
+                  .statements
+                  .push(Statement::Instruction(Instruction::Syscall));
+              }
+              _ => todo!(),
+            }
+          } else {
+            for (i, param) in params.iter().enumerate() {
+              let register = match param {
+                Operand::Identifier(ident) => {
+                  find_or_create_reg(&mut context.register_map, ident.clone())
+                }
+                Operand::LiteralStr(str) => {
+                  let register = new_register(&mut context.register_map);
+                  load_string(
+                    &mut context.text_section,
+                    &mut context.data_section,
+                    register.clone(),
+                    str.clone(),
+                  );
+
+                  register
+                }
+                Operand::LiteralBool(value) => {
+                  load_immediate_to_new_register(context, *value as u32)
+                }
+                Operand::LiteralI8(value) => load_immediate_to_new_register(context, *value as u32),
+                Operand::LiteralI16(value) => {
+                  load_immediate_to_new_register(context, *value as u32)
+                }
+                Operand::LiteralI32(value) => {
+                  load_immediate_to_new_register(context, *value as u32)
+                }
+                Operand::LiteralI64(value) => {
+                  load_immediate_to_new_register(context, *value as u32)
+                }
+                Operand::LiteralU8(value) => load_immediate_to_new_register(context, *value as u32),
+                Operand::LiteralU16(value) => {
+                  load_immediate_to_new_register(context, *value as u32)
+                }
+                Operand::LiteralU32(value) => load_immediate_to_new_register(context, *value),
+                Operand::LiteralU64(value) => {
+                  load_immediate_to_new_register(context, *value as u32)
+                }
+                Operand::LiteralF32(_) => todo!(),
+                Operand::LiteralF64(_) => todo!(),
+                Operand::Dereference(_) => todo!(),
+              };
+
+              context
+                .text_section
+                .statements
+                .push(Statement::Instruction(Instruction::Move(
+                  [
+                    InstructionArgument::Register(Register {
+                      name: format!("a{}", i),
+                    }),
+                    InstructionArgument::Register(Register { name: register }),
+                  ]
+                  .into(),
+                )));
+            }
+
+            context
+              .text_section
+              .statements
+              .push(Statement::Instruction(Instruction::Jal(
+                [InstructionArgument::Label(name)].into(),
+              )));
+          }
+        }
       }
     }
 
     let program = Program {
-      data_section,
-      text_section,
+      data_section: context.data_section.clone(),
+      text_section: context.text_section.clone(),
     };
 
     Ok(program.to_string())
   }
+}
+
+fn load_immediate_to_new_register(context: &mut Context, value: u32) -> String {
+  let register = new_register(&mut context.register_map);
+  load_immediate(&mut context.text_section, register.clone(), value);
+  register
 }
 
 fn find_or_create_reg(register_map: &mut HashMap<String, String>, name: String) -> String {
@@ -405,8 +595,6 @@ fn find_or_create_reg(register_map: &mut HashMap<String, String>, name: String) 
 }
 
 fn new_register(register_map: &mut HashMap<String, String>) -> String {
-  let next_register = register_map.len();
-
   let register = format!("$t{}", register_map.len());
   register_map.insert(register.clone(), register.clone());
   register
