@@ -3,11 +3,14 @@ use celestial_hub_astrolabe::{
     DataSection, Instruction, InstructionArgument, Program, Register, Statement, TextSection,
     Variable,
   },
-  lexer::tokens::{Type, Value},
+  lexer::{
+    tokens::{Type, Value},
+    traits::iterator,
+  },
 };
 
 use crate::ast::{
-  context, BinaryOperation, Condition, Expr, Function, Operand, Operator,
+  context, BinaryOperation, Condition, Expr, Function, FunctionCall, Operand, Operator,
   Statement as CompassStatement, VarType,
 };
 use std::collections::HashMap;
@@ -75,10 +78,32 @@ impl Codegen for MipsCodegen {
               Operand::LiteralU64(val) => {
                 return Err("Cannot store a 64-bit integer in a 32-bit register".to_string());
               }
-              Operand::LiteralBool(val) => todo!(),
+              Operand::LiteralBool(val) => {
+                load_immediate(&mut context.text_section, register, val as u32)
+              }
+              Operand::Identifier(var) => {
+                let var_register = context
+                  .register_map
+                  .get(&var)
+                  .ok_or_else(|| format!("Register {} not found", var))?
+                  .clone();
+
+                context
+                  .text_section
+                  .statements
+                  .push(Statement::Instruction(Instruction::Move(
+                    [
+                      InstructionArgument::Register(Register {
+                        name: register.clone(),
+                      }),
+                      InstructionArgument::Register(Register { name: var_register }),
+                    ]
+                    .into(),
+                  )));
+              }
+              // TODO: Handle float literals (should be in a different register)
               Operand::LiteralF32(val) => todo!(),
               Operand::LiteralF64(val) => todo!(),
-              Operand::Identifier(var) => todo!(),
               Operand::Dereference(_) => todo!(),
             },
             Expr::BinaryOperation(bin_op) => match bin_op {
@@ -185,24 +210,25 @@ impl Codegen for MipsCodegen {
                     .get(rhs)
                     .ok_or_else(|| format!("Register {} not found", rhs))?
                     .clone();
-
-                  context.text_section.statements.push(match condition {
-                    Condition::LessThan => {
-                      create_instruction!(
-                        Instruction::Slt,
-                        register,
-                        lhs_register,
-                        InstructionArgument::Register(Register { name: rhs_register })
-                      )
+                  let instruction = match condition {
+                    Condition::LessThan => Instruction::Slt,
+                    Condition::GreaterThan => Instruction::Sgt,
+                    Condition::LessThanOrEqual => Instruction::Sle,
+                    Condition::GreaterThanOrEqual => Instruction::Sge,
+                    Condition::Equal => Instruction::Seq,
+                    Condition::NotEqual => Instruction::Sne,
+                    Condition::And | Condition::Or => {
+                      return Err(
+                        "Cannot perform logical operations on immediate values".to_string(),
+                      );
                     }
-                    Condition::GreaterThan => todo!(),
-                    Condition::LessThanOrEqual => todo!(),
-                    Condition::GreaterThanOrEqual => todo!(),
-                    Condition::Equal => todo!(),
-                    Condition::NotEqual => todo!(),
-                    Condition::And => todo!(),
-                    Condition::Or => todo!(),
-                  });
+                  };
+                  context.text_section.statements.push(create_instruction!(
+                    instruction,
+                    register,
+                    lhs_register,
+                    InstructionArgument::Register(Register { name: rhs_register })
+                  ));
                 } else if is_register(&lhs) && is_immediate(&rhs) {
                   let lhs = lhs.as_identifier()?;
                   let lhs_register = context
@@ -212,27 +238,169 @@ impl Codegen for MipsCodegen {
                     .clone();
                   let rhs_value = rhs.as_immediate()?;
 
-                  context.text_section.statements.push(match condition {
-                    Condition::LessThan => {
-                      create_instruction!(
-                        Instruction::Slt,
-                        register,
-                        lhs_register,
-                        InstructionArgument::Immediate(rhs_value)
-                      )
+                  let instruction = match condition {
+                    Condition::LessThan => Instruction::Slt,
+                    Condition::GreaterThan => Instruction::Sgt,
+                    Condition::LessThanOrEqual => Instruction::Sle,
+                    Condition::GreaterThanOrEqual => Instruction::Sge,
+                    Condition::Equal => Instruction::Seq,
+                    Condition::NotEqual => Instruction::Sne,
+                    Condition::And | Condition::Or => {
+                      return Err(
+                        "Cannot perform logical operations on immediate values".to_string(),
+                      );
                     }
-                    Condition::GreaterThan => todo!(),
-                    Condition::LessThanOrEqual => todo!(),
-                    Condition::GreaterThanOrEqual => todo!(),
-                    Condition::Equal => todo!(),
-                    Condition::NotEqual => todo!(),
-                    Condition::And => todo!(),
-                    Condition::Or => todo!(),
-                  });
+                  };
+
+                  context.text_section.statements.push(create_instruction!(
+                    instruction,
+                    register,
+                    lhs_register,
+                    InstructionArgument::Immediate(rhs_value)
+                  ));
                 }
               }
             },
-            crate::ast::Expr::FunctionCall(_) => todo!(),
+            Expr::FunctionCall(function_call) => {
+              let function = context
+                .get_function(&function_call.name)
+                .ok_or_else(|| format!("Function {} not found", function_call.name))?;
+
+              if function.is_builtin {
+                match function.name.as_str() {
+                  "read_int" => {
+                    load_immediate(&mut context.text_section, "$v0".to_string(), 5);
+                  }
+                  "read_string" => {
+                    // $a0 = address of the buffer
+                    // $a1 = length of the buffer
+
+                    load_immediate(&mut context.text_section, "$v0".to_string(), 8);
+
+                    let size = if let Operand::LiteralU32(size) = &function_call.params[0] {
+                      *size
+                    } else {
+                      return Err("Invalid argument for read_string".to_string());
+                    };
+
+                    context.buffer_counter += 1;
+                    context.data_section.variables.push(Variable {
+                      name: format!("__buffer_{label}", label = context.buffer_counter),
+                      type_: Type::Space,
+                      value: Value::Bytes(size),
+                    });
+
+                    context.text_section.statements.append(
+                      &mut [
+                        Statement::Instruction(Instruction::La(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: "$a0".to_string(),
+                            }),
+                            InstructionArgument::Label("buffer".to_string()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::Li(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: "$a1".to_string(),
+                            }),
+                            InstructionArgument::Immediate(size),
+                          ]
+                          .into(),
+                        )),
+                      ]
+                      .into(),
+                    );
+                  }
+                  _ => Err(format!("Function {} not found", function.name))?,
+                };
+
+                context.text_section.statements.append(
+                  &mut [
+                    // Perform the syscall
+                    Statement::Instruction(Instruction::Syscall),
+                    // Move the result of the syscall to the register
+                    Statement::Instruction(Instruction::Move(
+                      [
+                        InstructionArgument::Register(Register {
+                          name: register.clone(),
+                        }),
+                        InstructionArgument::Register(Register {
+                          name: "$v0".to_string(),
+                        }),
+                      ]
+                      .into(),
+                    )),
+                  ]
+                  .into(),
+                );
+              } else {
+                function_call
+                  .params
+                  .iter()
+                  .enumerate()
+                  .for_each(|(i, param)| {
+                    let register = match param {
+                      Operand::Identifier(ident) => {
+                        find_or_create_reg(&mut context.register_map, ident.clone())
+                      }
+                      Operand::LiteralStr(str) => {
+                        let register = new_register(&mut context.register_map);
+                        load_string(
+                          &mut context.text_section,
+                          &mut context.data_section,
+                          register.clone(),
+                          str.clone(),
+                        );
+
+                        register
+                      }
+                      Operand::LiteralBool(value) => {
+                        load_immediate_to_new_register(context, *value as u32)
+                      }
+                      Operand::LiteralI8(value) => {
+                        load_immediate_to_new_register(context, *value as u32)
+                      }
+                      Operand::LiteralI16(value) => {
+                        load_immediate_to_new_register(context, *value as u32)
+                      }
+                      Operand::LiteralI32(value) => {
+                        load_immediate_to_new_register(context, *value as u32)
+                      }
+                      Operand::LiteralI64(value) => {
+                        load_immediate_to_new_register(context, *value as u32)
+                      }
+                      Operand::LiteralU8(value) => {
+                        load_immediate_to_new_register(context, *value as u32)
+                      }
+                      Operand::LiteralU16(value) => {
+                        load_immediate_to_new_register(context, *value as u32)
+                      }
+                      Operand::LiteralU32(value) => load_immediate_to_new_register(context, *value),
+                      Operand::LiteralU64(value) => {
+                        load_immediate_to_new_register(context, *value as u32)
+                      }
+                      Operand::LiteralF32(_) => todo!(),
+                      Operand::LiteralF64(_) => todo!(),
+                      Operand::Dereference(_) => todo!(),
+                    };
+
+                    context.text_section.statements.push(Statement::Instruction(
+                      Instruction::Move(
+                        [
+                          InstructionArgument::Register(Register {
+                            name: format!("$a{}", i),
+                          }),
+                          InstructionArgument::Register(Register { name: register }),
+                        ]
+                        .into(),
+                      ),
+                    ));
+                  });
+              }
+            }
           }
         }
         CompassStatement::ConditionalJump {
@@ -266,24 +434,85 @@ impl Codegen for MipsCodegen {
                   .ok_or_else(|| format!("Register {} not found", rhs))?
                   .clone();
 
-                let condition_instruction = match condition {
-                  Condition::LessThan => Instruction::Blt,
-                  Condition::GreaterThan => Instruction::Bgt,
-                  Condition::LessThanOrEqual => Instruction::Ble,
-                  Condition::GreaterThanOrEqual => Instruction::Bge,
-                  Condition::Equal => Instruction::Beq,
-                  Condition::NotEqual => Instruction::Bne,
-                  _ => Err(format!(
-                    "Invalid binary operation for conditional jump {op:?}",
-                  ))?,
-                };
+                match condition {
+                  Condition::And => {
+                    context.conditional_counter += 1;
+                    let new_label = format!("__and_{label}", label = context.conditional_counter);
 
-                context.text_section.statements.push(create_instruction!(
-                  condition_instruction,
-                  lhs_register,
-                  rhs_register,
-                  InstructionArgument::Label(label)
-                ));
+                    context.text_section.statements.append(
+                      &mut [
+                        Statement::Instruction(Instruction::Beqz(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: lhs_register.clone(),
+                            }),
+                            InstructionArgument::Label(new_label.clone()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::Beqz(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: rhs_register.clone(),
+                            }),
+                            InstructionArgument::Label(new_label.clone()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::J(
+                          [InstructionArgument::Label(label.clone())].into(),
+                        )),
+                        Statement::Label(new_label),
+                      ]
+                      .into(),
+                    );
+                  }
+                  Condition::Or => {
+                    context.text_section.statements.append(
+                      &mut [
+                        Statement::Instruction(Instruction::Bnez(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: lhs_register.clone(),
+                            }),
+                            InstructionArgument::Label(label.clone()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::Bnez(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: rhs_register.clone(),
+                            }),
+                            InstructionArgument::Label(label.clone()),
+                          ]
+                          .into(),
+                        )),
+                      ]
+                      .into(),
+                    );
+                  }
+                  _ => {
+                    let condition_instruction = match condition {
+                      Condition::LessThan => Instruction::Blt,
+                      Condition::GreaterThan => Instruction::Bgt,
+                      Condition::LessThanOrEqual => Instruction::Ble,
+                      Condition::GreaterThanOrEqual => Instruction::Bge,
+                      Condition::Equal => Instruction::Beq,
+                      Condition::NotEqual => Instruction::Bne,
+                      _ => Err(format!(
+                        "Invalid binary operation for conditional jump {op:?}",
+                      ))?,
+                    };
+
+                    context.text_section.statements.push(create_instruction!(
+                      condition_instruction,
+                      lhs_register,
+                      rhs_register,
+                      InstructionArgument::Label(label)
+                    ));
+                  }
+                };
               } else if is_register(&lhs) && is_immediate(&rhs) {
                 let lhs = lhs.as_identifier()?;
                 let lhs_register = context
@@ -293,28 +522,85 @@ impl Codegen for MipsCodegen {
                   .clone();
                 let rhs_value = rhs.as_immediate()?;
 
-                let condition_instruction = match condition {
-                  Condition::LessThan => Instruction::Blt,
-                  Condition::GreaterThan => Instruction::Bgt,
-                  Condition::LessThanOrEqual => Instruction::Ble,
-                  Condition::GreaterThanOrEqual => Instruction::Bge,
-                  Condition::Equal => Instruction::Beq,
-                  Condition::NotEqual => Instruction::Bne,
-                  _ => Err(format!(
-                    "Invalid binary operation for conditional jump {op:?}",
-                  ))?,
-                };
+                match condition {
+                  Condition::And => {
+                    context.conditional_counter += 1;
+                    let new_label = format!("__and_{label}", label = context.conditional_counter);
 
-                context.text_section.statements.push(Statement::Instruction(
-                  condition_instruction(
-                    [
-                      InstructionArgument::Register(Register { name: lhs_register }),
-                      InstructionArgument::Immediate(rhs_value),
-                      InstructionArgument::Label(label),
-                    ]
-                    .into(),
-                  ),
-                ));
+                    context.text_section.statements.append(
+                      &mut [
+                        Statement::Instruction(Instruction::Beqz(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: lhs_register.clone(),
+                            }),
+                            InstructionArgument::Label(new_label.clone()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::Beqz(
+                          [
+                            InstructionArgument::Immediate(rhs_value),
+                            InstructionArgument::Label(new_label.clone()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::J(
+                          [InstructionArgument::Label(label.clone())].into(),
+                        )),
+                        Statement::Label(new_label),
+                      ]
+                      .into(),
+                    );
+                  }
+                  Condition::Or => {
+                    context.text_section.statements.append(
+                      &mut [
+                        Statement::Instruction(Instruction::Bnez(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: lhs_register.clone(),
+                            }),
+                            InstructionArgument::Label(label.clone()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::Bnez(
+                          [
+                            InstructionArgument::Immediate(rhs_value),
+                            InstructionArgument::Label(label.clone()),
+                          ]
+                          .into(),
+                        )),
+                      ]
+                      .into(),
+                    );
+                  }
+                  _ => {
+                    let condition_instruction = match condition {
+                      Condition::LessThan => Instruction::Blt,
+                      Condition::GreaterThan => Instruction::Bgt,
+                      Condition::LessThanOrEqual => Instruction::Ble,
+                      Condition::GreaterThanOrEqual => Instruction::Bge,
+                      Condition::Equal => Instruction::Beq,
+                      Condition::NotEqual => Instruction::Bne,
+                      _ => Err(format!(
+                        "Invalid binary operation for conditional jump {op:?}",
+                      ))?,
+                    };
+
+                    context.text_section.statements.push(Statement::Instruction(
+                      condition_instruction(
+                        [
+                          InstructionArgument::Register(Register { name: lhs_register }),
+                          InstructionArgument::Immediate(rhs_value),
+                          InstructionArgument::Label(label),
+                        ]
+                        .into(),
+                      ),
+                    ));
+                  }
+                };
               }
             }
             _ => Err(format!(
@@ -432,12 +718,12 @@ impl Codegen for MipsCodegen {
           }
         },
         CompassStatement::NoOperation => {}
-        CompassStatement::Call {
+        CompassStatement::Call(FunctionCall {
           name,
           params,
           return_type,
           location,
-        } => {
+        }) => {
           let function = context
             .get_function(&name)
             .ok_or_else(|| format!("Function {} not found", name))?;
@@ -499,6 +785,54 @@ impl Codegen for MipsCodegen {
                   .statements
                   .push(Statement::Instruction(Instruction::Syscall));
               }
+              "write_int" => {
+                // Perform the write_int syscall (v0 = 1, a0 = integer value)
+                context
+                  .text_section
+                  .statements
+                  .push(Statement::Instruction(Instruction::Li(
+                    [
+                      InstructionArgument::Register(Register {
+                        name: "$v0".to_string(),
+                      }),
+                      InstructionArgument::Immediate(1),
+                    ]
+                    .into(),
+                  )));
+
+                let int_register = match &params[0] {
+                  Operand::Identifier(ident) => context
+                    .register_map
+                    .get(ident)
+                    .ok_or_else(|| format!("Register {} not found", ident))?
+                    .clone(),
+                  Operand::LiteralI8(val) => load_immediate_to_new_register(context, *val as u32),
+                  Operand::LiteralI16(val) => load_immediate_to_new_register(context, *val as u32),
+                  Operand::LiteralI32(val) => load_immediate_to_new_register(context, *val as u32),
+                  Operand::LiteralI64(val) => load_immediate_to_new_register(context, *val as u32),
+                  Operand::LiteralU8(val) => load_immediate_to_new_register(context, *val as u32),
+                  Operand::LiteralU16(val) => load_immediate_to_new_register(context, *val as u32),
+                  Operand::LiteralU32(val) => load_immediate_to_new_register(context, *val),
+                  Operand::LiteralU64(val) => load_immediate_to_new_register(context, *val as u32),
+                  _ => todo!(),
+                };
+
+                context.text_section.statements.append(
+                  &mut [
+                    Statement::Instruction(Instruction::Move(
+                      [
+                        InstructionArgument::Register(Register {
+                          name: "$a0".to_string(),
+                        }),
+                        InstructionArgument::Register(Register { name: int_register }),
+                      ]
+                      .into(),
+                    )),
+                    Statement::Instruction(Instruction::Syscall),
+                  ]
+                  .into(),
+                );
+              }
               _ => todo!(),
             }
           } else {
@@ -550,7 +884,7 @@ impl Codegen for MipsCodegen {
                 .push(Statement::Instruction(Instruction::Move(
                   [
                     InstructionArgument::Register(Register {
-                      name: format!("a{}", i),
+                      name: format!("$a{}", i),
                     }),
                     InstructionArgument::Register(Register { name: register }),
                   ]
@@ -603,21 +937,16 @@ fn new_register(register_map: &mut HashMap<String, String>) -> String {
 fn is_register(value: &crate::ast::Operand) -> bool {
   match value {
     Operand::Identifier(_) => true,
+    Operand::Dereference(_) => true,
     _ => false,
   }
 }
 
 fn is_immediate(value: &crate::ast::Operand) -> bool {
   match value {
-    Operand::LiteralI8(_) => true,
-    Operand::LiteralI16(_) => true,
-    Operand::LiteralI32(_) => true,
-    Operand::LiteralI64(_) => true,
-    Operand::LiteralU8(_) => true,
-    Operand::LiteralU16(_) => true,
-    Operand::LiteralU32(_) => true,
-    Operand::LiteralU64(_) => true,
-    _ => false,
+    Operand::Identifier(_) => false,
+    Operand::Dereference(_) => false,
+    _ => true,
   }
 }
 

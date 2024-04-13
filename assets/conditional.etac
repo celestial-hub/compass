@@ -1,0 +1,12 @@
+t1: bool = true
+t2: bool = false
+
+if t1 || false goto start
+t3: i32 = 32
+goto done
+
+start:
+  t3: i32 = 1
+
+done:
+  t2: bool = t3 == 1

@@ -49,6 +49,15 @@ impl std::fmt::Display for LexicalError {
           None => Ok(()),
         }
       }
+      LexicalError::UnusedValue { error, help } => {
+        for lexer::ErrorTip { message, location } in error {
+          writeln!(f, "error: {message:?} at {location:?}")?;
+        }
+        match help {
+          Some(help) => writeln!(f, "help: {help:?}"),
+          None => Ok(()),
+        }
+      }
     }
   }
 }

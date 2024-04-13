@@ -41,6 +41,10 @@ pub enum LexicalError {
     error: Vec<ErrorTip>,
     help: Option<String>,
   },
+  UnusedValue {
+    error: Vec<ErrorTip>,
+    help: Option<String>,
+  },
 }
 
 impl<'input> Lexer<'input> {

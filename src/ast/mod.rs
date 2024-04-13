@@ -129,14 +129,17 @@ pub enum Statement {
     location: Location,
   },
 
-  Call {
-    name: String,
-    params: Vec<Operand>,
-    return_type: VarType,
-    location: Location,
-  },
+  Call(FunctionCall),
 
   NoOperation,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FunctionCall {
+  pub name: String,
+  pub params: Vec<Operand>,
+  pub return_type: VarType,
+  pub location: Location,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -162,7 +165,7 @@ pub struct Function {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
   BinaryOperation(BinaryOperation),
-  FunctionCall(Function),
+  FunctionCall(FunctionCall),
   Operand(Operand),
 }
 
@@ -231,6 +234,9 @@ impl Operand {
       Operand::LiteralU16(val) => *val as u32,
       Operand::LiteralU32(val) => *val,
       Operand::LiteralU64(val) => *val as u32,
+      Operand::LiteralF32(val) => *val as u32,
+      Operand::LiteralF64(val) => *val as u32,
+      Operand::LiteralBool(val) => *val as u32,
       _ => return Err("Expected immediate, found register".to_string()),
     })
   }

@@ -69,7 +69,7 @@ Statement: ast::Statement = {
     let variable = match value.clone() {
       Expr::Operand(operand) => {
         match operand {
-          Operand::Identifier(variable_name) => {
+          Operand::Identifier(ref variable_name) => {
             let variable = context.get_variable(variable_name.clone()).ok_or(ParseError::User { error: LexicalError::UnknownVariable {
               error: vec![
                 ErrorTip { message: format!("unknown variable `{}`", variable_name), location: l3..r3 },
@@ -93,12 +93,18 @@ Statement: ast::Statement = {
               }});
             }
 
+            let value = if context.optimization_level > 0 {
+              variable.value.clone()
+            } else {
+              ast::Expr::Operand(operand)
+            };
+
             ast::Statement::VariableDeclaration(ast::Variable {
                 name,
+                value,
                 var_type: variable.var_type,
-                value: variable.value.clone(),
-                location: 0..0,
-                } )
+                location: l1..r1,
+            })
           },
           _ => {
             let var_type: VarType = var_type.try_into().unwrap();
@@ -124,7 +130,7 @@ Statement: ast::Statement = {
               name,
               var_type,
               value,
-              location: 0..0,
+              location: l1..r1,
             })
           },
         }
@@ -153,15 +159,15 @@ Statement: ast::Statement = {
         }
 
         ast::Statement::VariableDeclaration(ast::Variable {
-            name,
-            var_type,
-            value: Expr::BinaryOperation(bin_op),
-            location: 0..0,
-            })
+          name,
+          var_type,
+          value: Expr::BinaryOperation(bin_op),
+          location: l1..r1,
+        })
       },
       Expr::FunctionCall(function) => {
         let var_type: VarType = var_type.try_into().unwrap();
-        let value_type: VarType = function.return_type.clone().try_into().unwrap();
+        let value_type: VarType = function.return_type;
 
         if var_type != value_type {
           return Err(ParseError::User { error: LexicalError::WrongType {
@@ -180,11 +186,11 @@ Statement: ast::Statement = {
         }
 
         ast::Statement::VariableDeclaration(ast::Variable {
-            name,
-            var_type,
-            value: Expr::FunctionCall(function),
-            location: 0..0,
-            })
+          name,
+          var_type,
+          value: Expr::FunctionCall(function),
+          location: l1..r1,
+        })
       }
     };
 
@@ -341,6 +347,46 @@ Statement: ast::Statement = {
     }
   },
 
+  <l:@L> <function:FunctionCall> <r:@R> =>? {
+    if function.return_type != VarType::Void {
+      // The function return a value that is not being used
+      return Err(ParseError::User { error: LexicalError::UnusedValue {
+        error: vec![
+          ErrorTip { message: format!("unused value of type `{}`", Into::<String>::into(function.return_type)), location: l..r },
+        ],
+        help: Some("You can either assign the value to a variable or remove the function call".to_string())
+      }});
+    }
+
+
+    Ok(ast::Statement::Call(function))
+  },
+};
+
+Return: ast::Return = {
+  ":" <var_type:"type"> => {
+    ast::Return { var_type: var_type.into() }
+  },
+}
+
+Arguments: Vec<ast::Argument> = {
+  <args:Argument*> => args
+};
+
+Argument: ast::Argument = {
+  <name:"identifier"> ":" <var_type:"type"> => {
+    ast::Argument {
+      name,
+      var_type: var_type.into(),
+    }
+  },
+};
+
+Parameters: Vec<ast::Operand> = {
+  <params:Operand*> => params
+};
+
+FunctionCall: ast::FunctionCall = {
   <l:@L> "call" <r:@R> <l1:@L> <name:"identifier"> <r1:@R> "(" <l2:@L> <params:Parameters> <r2:@R> ")" =>? {
     let function = context.get_function(&name).ok_or(ParseError::User { error: LexicalError::UnknownFunction {
       error: vec![
@@ -383,37 +429,13 @@ Statement: ast::Statement = {
       }
     }
 
-    Ok(ast::Statement::Call {
+    Ok(ast::FunctionCall {
       name,
       params,
       return_type: function.return_type,
       location: l..r,
     })
   }
-
-};
-
-Return: ast::Return = {
-  ":" <var_type:"type"> => {
-    ast::Return { var_type: var_type.into() }
-  },
-}
-
-Arguments: Vec<ast::Argument> = {
-  <args:Argument*> => args
-};
-
-Argument: ast::Argument = {
-  <name:"identifier"> ":" <var_type:"type"> => {
-    ast::Argument {
-      name,
-      var_type: var_type.into(),
-    }
-  },
-};
-
-Parameters: Vec<ast::Operand> = {
-  <params:Operand*> => params
 };
 
 BinaryOperation: ast::BinaryOperation = {
@@ -506,6 +528,7 @@ Operator: ast::Operator = {
 Expr: ast::Expr = {
   BinaryOperation => Expr::BinaryOperation(<>),
   Operand => Expr::Operand(<>),
+  FunctionCall => Expr::FunctionCall(<>),
 };
 
 Condition: ast::Condition = {
