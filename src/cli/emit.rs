@@ -17,7 +17,7 @@ pub fn ast(
   EmitASTOptions { filepath, debug }: &EmitASTOptions,
 ) -> Result<Vec<Statement>, Box<dyn std::error::Error>> {
   let source_code = std::fs::read_to_string(filepath)?;
-  let lexer = Lexer::new(&source_code[..], filepath);
+  let lexer = Lexer::new(&source_code[..], filepath).map_err(|e| e.to_string())?;
 
   if *debug > 0 {
     println!("{}", lexer);

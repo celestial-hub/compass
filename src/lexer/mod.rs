@@ -48,18 +48,16 @@ pub enum LexicalError {
 }
 
 impl<'input> Lexer<'input> {
-  pub fn new(source_code: &'input str, filepath: &'input str) -> Self {
+  pub fn new(source_code: &'input str, filepath: &'input str) -> Result<Self, LexicalError> {
     let lexer = Self {
       token_stream: Token::lexer(source_code).spanned(),
       filepath,
       source_code,
     };
 
-    if lexer.validate().is_err() {
-      std::process::exit(1);
-    }
+    lexer.validate()?;
 
-    lexer
+    Ok(lexer)
   }
 }
 
