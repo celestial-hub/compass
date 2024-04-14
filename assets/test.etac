@@ -1,1 +1,2 @@
-call write_int(1)
+t0: str = call read_string(50u32)
+call write_string(t0)

@@ -138,8 +138,18 @@ impl Codegen for MipsCodegen {
                       lhs_register,
                       InstructionArgument::Register(Register { name: rhs_register })
                     ),
-                    Operator::Mul => todo!(),
-                    Operator::Div => todo!(),
+                    Operator::Mul => create_instruction!(
+                      Instruction::Mul,
+                      register,
+                      lhs_register,
+                      InstructionArgument::Register(Register { name: rhs_register })
+                    ),
+                    Operator::Div => create_instruction!(
+                      Instruction::Div,
+                      register,
+                      lhs_register,
+                      InstructionArgument::Register(Register { name: rhs_register })
+                    ),
                   });
                 } else if is_register(&lhs) && is_immediate(&rhs) {
                   let lhs = lhs.as_identifier()?;
@@ -152,13 +162,29 @@ impl Codegen for MipsCodegen {
 
                   context.text_section.statements.push(match operator {
                     Operator::Add => create_instruction!(
-                      Instruction::Addi,
+                      Instruction::Add,
                       register,
                       lhs_register,
                       InstructionArgument::Immediate(rhs_value)
                     ),
-                    // Handle other operators (Sub, Mul, Div) similarly...
-                    _ => todo!(),
+                    Operator::Sub => create_instruction!(
+                      Instruction::Sub,
+                      register,
+                      lhs_register,
+                      InstructionArgument::Immediate(rhs_value)
+                    ),
+                    Operator::Mul => create_instruction!(
+                      Instruction::Mul,
+                      register,
+                      lhs_register,
+                      InstructionArgument::Immediate(rhs_value)
+                    ),
+                    Operator::Div => create_instruction!(
+                      Instruction::Div,
+                      register,
+                      lhs_register,
+                      InstructionArgument::Immediate(rhs_value)
+                    ),
                   });
                 } else if is_immediate(&lhs) && is_immediate(&rhs) {
                   let rhs = rhs.as_immediate()?;
@@ -170,12 +196,29 @@ impl Codegen for MipsCodegen {
 
                   context.text_section.statements.push(match operator {
                     Operator::Add => create_instruction!(
-                      Instruction::Addi,
+                      Instruction::Add,
                       register,
                       lhs_register,
                       InstructionArgument::Immediate(rhs)
                     ),
-                    // Handle other operators (Sub, Mul, Div) similarly...
+                    Operator::Sub => create_instruction!(
+                      Instruction::Sub,
+                      register,
+                      lhs_register,
+                      InstructionArgument::Immediate(rhs)
+                    ),
+                    Operator::Mul => create_instruction!(
+                      Instruction::Mul,
+                      register,
+                      lhs_register,
+                      InstructionArgument::Immediate(rhs)
+                    ),
+                    Operator::Div => create_instruction!(
+                      Instruction::Div,
+                      register,
+                      lhs_register,
+                      InstructionArgument::Immediate(rhs)
+                    ),
                     _ => todo!(),
                   });
                 } else {
@@ -184,9 +227,8 @@ impl Codegen for MipsCodegen {
                     lhs, rhs
                   ))?;
                 }
-                // Handle other cases...
               }
-              crate::ast::BinaryOperation::Conditional {
+              BinaryOperation::Conditional {
                 lhs,
                 condition,
                 rhs,
@@ -717,7 +759,6 @@ impl Codegen for MipsCodegen {
             ))?;
           }
         },
-        CompassStatement::NoOperation => {}
         CompassStatement::Call(FunctionCall {
           name,
           params,
@@ -900,6 +941,7 @@ impl Codegen for MipsCodegen {
               )));
           }
         }
+        CompassStatement::NoOperation => {}
       }
     }
 
