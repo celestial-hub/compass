@@ -326,8 +326,9 @@ impl Codegen for MipsCodegen {
                     };
 
                     context.buffer_counter += 1;
+                    let label = format!("__buffer_{label}", label = context.buffer_counter);
                     context.data_section.variables.push(Variable {
-                      name: format!("__buffer_{label}", label = context.buffer_counter),
+                      name: label.clone(),
                       type_: Type::Space,
                       value: Value::Bytes(size),
                     });
@@ -339,7 +340,7 @@ impl Codegen for MipsCodegen {
                             InstructionArgument::Register(Register {
                               name: "$a0".to_string(),
                             }),
-                            InstructionArgument::Label("buffer".to_string()),
+                            InstructionArgument::Label(label),
                           ]
                           .into(),
                         )),
