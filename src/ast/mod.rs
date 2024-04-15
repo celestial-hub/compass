@@ -224,19 +224,19 @@ impl Operand {
     })
   }
 
-  pub fn as_immediate(&self) -> Result<u32, String> {
+  pub fn as_immediate(&self) -> Result<i32, String> {
     Ok(match self {
-      Operand::LiteralI8(val) => *val as u32,
-      Operand::LiteralI16(val) => *val as u32,
-      Operand::LiteralI32(val) => *val as u32,
-      Operand::LiteralI64(val) => *val as u32,
-      Operand::LiteralU8(val) => *val as u32,
-      Operand::LiteralU16(val) => *val as u32,
-      Operand::LiteralU32(val) => *val,
-      Operand::LiteralU64(val) => *val as u32,
-      Operand::LiteralF32(val) => *val as u32,
-      Operand::LiteralF64(val) => *val as u32,
-      Operand::LiteralBool(val) => *val as u32,
+      Operand::LiteralI8(val) => *val as i32,
+      Operand::LiteralI16(val) => *val as i32,
+      Operand::LiteralI32(val) => *val as i32,
+      Operand::LiteralI64(val) => *val as i32,
+      Operand::LiteralU8(val) => *val as i32,
+      Operand::LiteralU16(val) => *val as i32,
+      Operand::LiteralU32(val) => *val as i32,
+      Operand::LiteralU64(val) => *val as i32,
+      Operand::LiteralF32(val) => *val as i32,
+      Operand::LiteralF64(val) => *val as i32,
+      Operand::LiteralBool(val) => *val as i32,
       _ => return Err("Expected immediate, found register".to_string()),
     })
   }

@@ -51,24 +51,24 @@ impl Codegen for MipsCodegen {
           match var.value {
             Expr::Operand(op) => match op {
               Operand::LiteralI8(val) => {
-                load_immediate(&mut context.text_section, register, val as u32)
+                load_immediate(&mut context.text_section, register, val as i32)
               }
               Operand::LiteralI16(val) => {
-                load_immediate(&mut context.text_section, register, val as u32)
+                load_immediate(&mut context.text_section, register, val as i32)
               }
-              Operand::LiteralI32(val) => {
-                load_immediate(&mut context.text_section, register, val as u32)
-              }
+              Operand::LiteralI32(val) => load_immediate(&mut context.text_section, register, val),
               Operand::LiteralI64(val) => {
-                load_immediate(&mut context.text_section, register, val as u32)
+                load_immediate(&mut context.text_section, register, val as i32)
               }
               Operand::LiteralU8(val) => {
-                load_immediate(&mut context.text_section, register, val as u32)
+                load_immediate(&mut context.text_section, register, val as i32)
               }
               Operand::LiteralU16(val) => {
-                load_immediate(&mut context.text_section, register, val as u32)
+                load_immediate(&mut context.text_section, register, val as i32)
               }
-              Operand::LiteralU32(val) => load_immediate(&mut context.text_section, register, val),
+              Operand::LiteralU32(val) => {
+                load_immediate(&mut context.text_section, register, val as i32)
+              }
               Operand::LiteralStr(val) => load_string(
                 &mut context.text_section,
                 &mut context.data_section,
@@ -79,7 +79,7 @@ impl Codegen for MipsCodegen {
                 return Err("Cannot store a 64-bit integer in a 32-bit register".to_string());
               }
               Operand::LiteralBool(val) => {
-                load_immediate(&mut context.text_section, register, val as u32)
+                load_immediate(&mut context.text_section, register, val as i32)
               }
               Operand::Identifier(var) => {
                 let var_register = context
@@ -319,8 +319,8 @@ impl Codegen for MipsCodegen {
 
                     load_immediate(&mut context.text_section, "$v0".to_string(), 8);
 
-                    let size = if let Operand::LiteralU32(size) = &function_call.params[0] {
-                      *size
+                    let size: i32 = if let Operand::LiteralU32(size) = &function_call.params[0] {
+                      *size as i32
                     } else {
                       return Err("Invalid argument for read_string".to_string());
                     };
@@ -401,29 +401,31 @@ impl Codegen for MipsCodegen {
                         register
                       }
                       Operand::LiteralBool(value) => {
-                        load_immediate_to_new_register(context, *value as u32)
+                        load_immediate_to_new_register(context, *value as i32)
                       }
                       Operand::LiteralI8(value) => {
-                        load_immediate_to_new_register(context, *value as u32)
+                        load_immediate_to_new_register(context, *value as i32)
                       }
                       Operand::LiteralI16(value) => {
-                        load_immediate_to_new_register(context, *value as u32)
+                        load_immediate_to_new_register(context, *value as i32)
                       }
                       Operand::LiteralI32(value) => {
-                        load_immediate_to_new_register(context, *value as u32)
+                        load_immediate_to_new_register(context, *value as i32)
                       }
                       Operand::LiteralI64(value) => {
-                        load_immediate_to_new_register(context, *value as u32)
+                        load_immediate_to_new_register(context, *value as i32)
                       }
                       Operand::LiteralU8(value) => {
-                        load_immediate_to_new_register(context, *value as u32)
+                        load_immediate_to_new_register(context, *value as i32)
                       }
                       Operand::LiteralU16(value) => {
-                        load_immediate_to_new_register(context, *value as u32)
+                        load_immediate_to_new_register(context, *value as i32)
                       }
-                      Operand::LiteralU32(value) => load_immediate_to_new_register(context, *value),
+                      Operand::LiteralU32(value) => {
+                        load_immediate_to_new_register(context, *value as i32)
+                      }
                       Operand::LiteralU64(value) => {
-                        load_immediate_to_new_register(context, *value as u32)
+                        load_immediate_to_new_register(context, *value as i32)
                       }
                       Operand::LiteralF32(_) => todo!(),
                       Operand::LiteralF64(_) => todo!(),
@@ -848,14 +850,14 @@ impl Codegen for MipsCodegen {
                     .get(ident)
                     .ok_or_else(|| format!("Register {} not found", ident))?
                     .clone(),
-                  Operand::LiteralI8(val) => load_immediate_to_new_register(context, *val as u32),
-                  Operand::LiteralI16(val) => load_immediate_to_new_register(context, *val as u32),
-                  Operand::LiteralI32(val) => load_immediate_to_new_register(context, *val as u32),
-                  Operand::LiteralI64(val) => load_immediate_to_new_register(context, *val as u32),
-                  Operand::LiteralU8(val) => load_immediate_to_new_register(context, *val as u32),
-                  Operand::LiteralU16(val) => load_immediate_to_new_register(context, *val as u32),
-                  Operand::LiteralU32(val) => load_immediate_to_new_register(context, *val),
-                  Operand::LiteralU64(val) => load_immediate_to_new_register(context, *val as u32),
+                  Operand::LiteralI8(val) => load_immediate_to_new_register(context, *val as i32),
+                  Operand::LiteralI16(val) => load_immediate_to_new_register(context, *val as i32),
+                  Operand::LiteralI32(val) => load_immediate_to_new_register(context, *val as i32),
+                  Operand::LiteralI64(val) => load_immediate_to_new_register(context, *val as i32),
+                  Operand::LiteralU8(val) => load_immediate_to_new_register(context, *val as i32),
+                  Operand::LiteralU16(val) => load_immediate_to_new_register(context, *val as i32),
+                  Operand::LiteralU32(val) => load_immediate_to_new_register(context, *val as i32),
+                  Operand::LiteralU64(val) => load_immediate_to_new_register(context, *val as i32),
                   _ => todo!(),
                 };
 
@@ -895,25 +897,27 @@ impl Codegen for MipsCodegen {
                   register
                 }
                 Operand::LiteralBool(value) => {
-                  load_immediate_to_new_register(context, *value as u32)
+                  load_immediate_to_new_register(context, *value as i32)
                 }
-                Operand::LiteralI8(value) => load_immediate_to_new_register(context, *value as u32),
+                Operand::LiteralI8(value) => load_immediate_to_new_register(context, *value as i32),
                 Operand::LiteralI16(value) => {
-                  load_immediate_to_new_register(context, *value as u32)
+                  load_immediate_to_new_register(context, *value as i32)
                 }
                 Operand::LiteralI32(value) => {
-                  load_immediate_to_new_register(context, *value as u32)
+                  load_immediate_to_new_register(context, *value as i32)
                 }
                 Operand::LiteralI64(value) => {
-                  load_immediate_to_new_register(context, *value as u32)
+                  load_immediate_to_new_register(context, *value as i32)
                 }
-                Operand::LiteralU8(value) => load_immediate_to_new_register(context, *value as u32),
+                Operand::LiteralU8(value) => load_immediate_to_new_register(context, *value as i32),
                 Operand::LiteralU16(value) => {
-                  load_immediate_to_new_register(context, *value as u32)
+                  load_immediate_to_new_register(context, *value as i32)
                 }
-                Operand::LiteralU32(value) => load_immediate_to_new_register(context, *value),
+                Operand::LiteralU32(value) => {
+                  load_immediate_to_new_register(context, *value as i32)
+                }
                 Operand::LiteralU64(value) => {
-                  load_immediate_to_new_register(context, *value as u32)
+                  load_immediate_to_new_register(context, *value as i32)
                 }
                 Operand::LiteralF32(_) => todo!(),
                 Operand::LiteralF64(_) => todo!(),
@@ -955,7 +959,7 @@ impl Codegen for MipsCodegen {
   }
 }
 
-fn load_immediate_to_new_register(context: &mut Context, value: u32) -> String {
+fn load_immediate_to_new_register(context: &mut Context, value: i32) -> String {
   let register = new_register(&mut context.register_map);
   load_immediate(&mut context.text_section, register.clone(), value);
   register
@@ -993,7 +997,7 @@ fn is_immediate(value: &crate::ast::Operand) -> bool {
   }
 }
 
-fn load_immediate(text_section: &mut TextSection, register: String, value: u32) {
+fn load_immediate(text_section: &mut TextSection, register: String, value: i32) {
   text_section
     .statements
     .push(Statement::Instruction(Instruction::Li(
