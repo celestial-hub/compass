@@ -300,6 +300,33 @@ impl Codegen for MipsCodegen {
                     lhs_register,
                     InstructionArgument::Immediate(rhs_value)
                   ));
+                } else if is_immediate(&lhs) && is_immediate(&rhs) {
+                  let lhs_value = lhs.as_immediate()?;
+                  let rhs_value = rhs.as_immediate()?;
+
+                  let lhs_register = new_register(&mut context.register_map);
+                  load_immediate(&mut context.text_section, lhs_register.clone(), lhs_value);
+
+                  let instruction = match condition {
+                    Condition::LessThan => Instruction::Slt,
+                    Condition::GreaterThan => Instruction::Sgt,
+                    Condition::LessThanOrEqual => Instruction::Sle,
+                    Condition::GreaterThanOrEqual => Instruction::Sge,
+                    Condition::Equal => Instruction::Seq,
+                    Condition::NotEqual => Instruction::Sne,
+                    Condition::And | Condition::Or => {
+                      return Err(
+                        "Cannot perform logical operations on immediate values".to_string(),
+                      );
+                    }
+                  };
+
+                  context.text_section.statements.push(create_instruction!(
+                    instruction,
+                    register,
+                    lhs_register,
+                    InstructionArgument::Immediate(rhs_value)
+                  ));
                 }
               }
             },
@@ -646,6 +673,92 @@ impl Codegen for MipsCodegen {
                     ));
                   }
                 };
+              } else if is_immediate(&lhs) && is_immediate(&rhs) {
+                let lhs_value = lhs.as_immediate()?;
+                let rhs_value = rhs.as_immediate()?;
+
+                let lhs_register = new_register(&mut context.register_map);
+                load_immediate(&mut context.text_section, lhs_register.clone(), lhs_value);
+
+                match condition {
+                  Condition::And => {
+                    context.conditional_counter += 1;
+                    let new_label = format!("__and_{label}", label = context.conditional_counter);
+
+                    context.text_section.statements.append(
+                      &mut [
+                        Statement::Instruction(Instruction::Beqz(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: lhs_register.clone(),
+                            }),
+                            InstructionArgument::Label(new_label.clone()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::Beqz(
+                          [
+                            InstructionArgument::Immediate(rhs_value),
+                            InstructionArgument::Label(new_label.clone()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::J(
+                          [InstructionArgument::Label(label.clone())].into(),
+                        )),
+                        Statement::Label(new_label),
+                      ]
+                      .into(),
+                    );
+                  }
+                  Condition::Or => {
+                    context.text_section.statements.append(
+                      &mut [
+                        Statement::Instruction(Instruction::Bnez(
+                          [
+                            InstructionArgument::Register(Register {
+                              name: lhs_register.clone(),
+                            }),
+                            InstructionArgument::Label(label.clone()),
+                          ]
+                          .into(),
+                        )),
+                        Statement::Instruction(Instruction::Bnez(
+                          [
+                            InstructionArgument::Immediate(rhs_value),
+                            InstructionArgument::Label(label.clone()),
+                          ]
+                          .into(),
+                        )),
+                      ]
+                      .into(),
+                    );
+                  }
+                  _ => {
+                    let condition_instruction = match condition {
+                      Condition::LessThan => Instruction::Blt,
+                      Condition::GreaterThan => Instruction::Bgt,
+                      Condition::LessThanOrEqual => Instruction::Ble,
+                      Condition::GreaterThanOrEqual => Instruction::Bge,
+                      Condition::Equal => Instruction::Beq,
+                      Condition::NotEqual => Instruction::Bne,
+                      _ => Err(format!(
+                        "Invalid binary operation for conditional jump {op:?}",
+                      ))?,
+                    };
+
+                    context.text_section.statements.push(Statement::Instruction(
+                      condition_instruction(
+                        [
+                          InstructionArgument::Register(Register { name: lhs_register }),
+                          InstructionArgument::Immediate(rhs_value),
+                          InstructionArgument::Label(label),
+                        ]
+                        .into(),
+                      ),
+                    ));
+                  }
+                }
               }
             }
             _ => Err(format!(
@@ -949,6 +1062,12 @@ impl Codegen for MipsCodegen {
         CompassStatement::NoOperation => {}
       }
     }
+
+    // Add halt
+    context
+      .text_section
+      .statements
+      .push(Statement::Instruction(Instruction::Halt));
 
     let program = Program {
       data_section: context.data_section.clone(),

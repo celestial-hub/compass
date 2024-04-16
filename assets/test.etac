@@ -1,2 +1,5 @@
-t0: str = call read_string(50u32)
-call write_string(t0)
+if 1 < 2 goto label_1
+goto label_2
+
+label_1:
+label_2:
